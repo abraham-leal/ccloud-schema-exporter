@@ -12,18 +12,17 @@ The exporter expects the following variables to be set in the environment to mak
 - `SRC_SR_URL` : The URL for the source Schema Registry
 - `SRC_API_KEY` : The API KEY to be used to make calls to the source Schema Registry
 - `SRC_API_SECRET` : The API SECRET to be used to make calls to the source Schema Registry
-- `DEST_SR_URL` : The URL for the destination Schema Registry
-- `DEST_API_KEY` : The API KEY to be used to make calls to the destination Schema Registry
-- `DEST_API_SECRET` : The API SECRET to be used to make calls to the destination Schema Registry
+- `DST_SR_URL` : The URL for the destination Schema Registry
+- `DST_API_KEY` : The API KEY to be used to make calls to the destination Schema Registry
+- `DST_API_SECRET` : The API SECRET to be used to make calls to the destination Schema Registry
 
 It is also possible to define the credentials through command flags. If both are defined, the flags take precedence.
 
 ## Build
 ````
 git clone https://github.com/abraham-leal/ccloud-schema-exporter
-cd ccloud-schema-exporter
-go get github.com/abraham-leal/ccloud-schema-exporter/cmd/ccloud-schema-exporter
-go install github.com/abraham-leal/ccloud-schema-exporter/cmd/ccloud-schema-exporter
+cd ccloud-schema-exporter/cmd/ccloud-schema-exporter
+go build
 ````
 
 ## Run
@@ -58,15 +57,13 @@ Usage of ./ccloud-schema-exporter:
 
 #### Example Usage 
 ````
-go get github.com/abraham-leal/ccloud-schema-exporter/cmd/ccloud-schema-exporter
-go install github.com/abraham-leal/ccloud-schema-exporter/cmd/ccloud-schema-exporter
 export SRC_SR_URL=XXXX
 export SRC_API_KEY=XXXX
 export SRC_API_SECRET=XXXX
 export DST_SR_URL=XXXX
 export DST_API_KEY=XXXX
 export DST_API_SECRET=XXXX
-./cmd/ccloud-schema-exporter/ccloud-schema-exporter
+./ccloud-schema-exporter
 ````
 
 

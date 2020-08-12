@@ -6,8 +6,8 @@ package main
 //
 
 import (
-	"fmt"
 	"github.com/abraham-leal/ccloud-schema-exporter/cmd/internals"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
