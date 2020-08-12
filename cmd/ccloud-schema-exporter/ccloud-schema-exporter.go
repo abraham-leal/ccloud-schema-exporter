@@ -20,12 +20,12 @@ func main() {
 	srcClient := client.NewSchemaRegistryClient(client.SrcSRUrl,client.SrcSRKey, client.SrcSRSecret , "src")
 	if (!srcClient.IsReachable()){
 		fmt.Println("Could not reach source registry. Possible bad credentials?")
-		os.Exit(1);
+		os.Exit(0);
 	}
 	destClient := client.NewSchemaRegistryClient(client.DestSRUrl, client.DestSRKey, client.DestSRSecret, "dest")
 	if (!destClient.IsReachable()){
 		fmt.Println("Could not reach destination registry. Possible bad credentials?")
-		os.Exit(1);
+		os.Exit(0);
 	}
 
 	destSubjects := destClient.GetSubjectsWithVersions()
