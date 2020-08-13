@@ -1,4 +1,5 @@
 .idea/
 .env
+ccloud-schema-exporter
 export_env.sh
 cmd/ccloud-schema-exporter/ccloud-schema-exporter
