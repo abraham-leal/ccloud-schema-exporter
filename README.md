@@ -49,8 +49,8 @@ For Docker, the `latest` tag will build directly from master. The master branch 
 However, for stable images tag a release.
 
 ## Run
-`./ccloud-schema-exporter -batchExport` : Running the app with this flag will perform a batch export.
-`./ccloud-schema-exporter -sync` : Running the app with this flag will start a continuous sync 
+- `./ccloud-schema-exporter -batchExport` : Running the app with this flag will perform a batch export.
+- `./ccloud-schema-exporter -sync` : Running the app with this flag will start a continuous sync 
 between source and destination schema registries.
 
 When both flags are applied, `sync` mode prevails.
