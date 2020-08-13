@@ -32,11 +32,11 @@ go build ./cmd/ccloud-schema-exporter/ccloud-schema-exporter.go
 ````
 docker run \
   -e SRC_SR_URL=$SRC_SR_URL \
-  -e SRC_API_KEY=$SRC_API_KEY
-  -e SRC_API_SECRET=$SRC_API_SECRET
+  -e SRC_API_KEY=$SRC_API_KEY \
+  -e SRC_API_SECRET=$SRC_API_SECRET \
   -e DST_SR_URL=$DST_SR_URL \
-  -e DST_API_KEY=$DST_API_KEY
-  -e DST_API_SECRET=$DST_API_SECRET
+  -e DST_API_KEY=$DST_API_KEY \
+  -e DST_API_SECRET=$DST_API_SECRET \
   abrahamleal/ccloud-schema-exporter:latest
 ````
 
