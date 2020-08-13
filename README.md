@@ -69,9 +69,9 @@ Usage of ./ccloud-schema-exporter:
   -dest-sr-secret string
     	API SECRET for the Destination Schema Registry Cluster
   -dest-sr-url string
-    	Url to the Source Schema Registry Cluster
+    	Url to the Destination Schema Registry Cluster
   -scrapeInterval int
-    	Amount of time ccloud-schema-exporter will delay between schema sync checks (default 60)
+    	Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds(default 60)
   -src-sr-key string
     	API KEY for the Source Schema Registry Cluster
   -src-sr-secret string
