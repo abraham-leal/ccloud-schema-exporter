@@ -10,13 +10,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"io/ioutil"
+	"net/http"
 	"strconv"
+	"sync"
 	"time"
 )
-
-var inMemSchemas map[string][]int
 
 func NewSchemaRegistryClient(SR string, API_KEY string, API_SECRET string, target string) SchemaRegistryClient {
 	client := SchemaRegistryClient{}
@@ -24,13 +23,14 @@ func NewSchemaRegistryClient(SR string, API_KEY string, API_SECRET string, targe
 	// If the paramethers are empty, go fetch from env
 	if (SR == "" || API_KEY == "" || API_SECRET == "") {
 		if (target == "dst") {
-			client = SchemaRegistryClient{SRUrl: DestGetSRUrl(),SRApiKey: DestGetAPIKey(), SRApiSecret: DestGetAPISecret()}
-		} else {
-			client = SchemaRegistryClient{SRUrl: SrcGetSRUrl(),SRApiKey: SrcGetAPIKey(), SRApiSecret: SrcGetAPISecret()}
+			client = SchemaRegistryClient{SRUrl: DestGetSRUrl(),SRApiKey: DestGetAPIKey(), SRApiSecret: DestGetAPISecret(), InMemSchemas: map[string][]int{}}
+		}
+		if (target == "src"){
+			client = SchemaRegistryClient{SRUrl: SrcGetSRUrl(),SRApiKey: SrcGetAPIKey(), SRApiSecret: SrcGetAPISecret(), InMemSchemas: map[string][]int{}}
 		}
 	} else {
 		// Enables passing in the vars through flags
-		client = SchemaRegistryClient{SRUrl: SR,SRApiKey: API_KEY, SRApiSecret: API_SECRET}
+		client = SchemaRegistryClient{SRUrl: SR,SRApiKey: API_KEY, SRApiSecret: API_SECRET, InMemSchemas: map[string][]int{}}
 	}
 
 	httpClient = http.Client{
@@ -53,21 +53,7 @@ func (src SchemaRegistryClient) IsReachable() bool {
 
 }
 
-func (src SchemaRegistryClient) GetSubjectsAsString() string {
-	endpoint := src.SRUrl+"/subjects"
-	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
-
-	res, err := httpClient.Do(req)
-	if err != nil {
-		fmt.Printf(err.Error())
-	}
-	body, _ := ioutil.ReadAll(res.Body)
-	bodyString := string(body)
-
-	return bodyString
-}
-
-func (src SchemaRegistryClient) GetSubjectsWithVersions() map[string][]int{
+func (src SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[string][]int) {
 	endpoint := src.SRUrl+"/subjects"
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
 
@@ -87,7 +73,6 @@ func (src SchemaRegistryClient) GetSubjectsWithVersions() map[string][]int{
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		fmt.Printf(err.Error())
-		return map[string][]int{}
 	}
 
 	err = json.Unmarshal(body,&response)
@@ -95,16 +80,27 @@ func (src SchemaRegistryClient) GetSubjectsWithVersions() map[string][]int{
 		fmt.Printf(err.Error())
 	}
 
-	inMemSchemas = map[string][]int{}
+	var aGroup sync.WaitGroup
+	aGroup.Add(len(response))
+	aChan := make(chan SubjectWithVersions, 1000)
 
 	for _, s := range response {
-		inMemSchemas[s] = src.GetVersions(s)
+		go src.GetVersions(s, aChan, &aGroup)
 	}
 
-	return inMemSchemas
+	aGroup.Wait()
+	close(aChan)
+
+	//Collect SubjectWithVersions
+	for item := range aChan {
+		src.InMemSchemas[item.Subject] = item.Versions
+	}
+
+	// Send back to main thread
+	chanY <- src.InMemSchemas
 }
 
-func (src SchemaRegistryClient) GetVersions (subject string) []int {
+func (src SchemaRegistryClient) GetVersions (subject string, chanX chan <- SubjectWithVersions, wg *sync.WaitGroup) {
 	endpoint := src.SRUrl+"/subjects/"+subject+"/versions"
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
 
@@ -124,7 +120,6 @@ func (src SchemaRegistryClient) GetVersions (subject string) []int {
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		fmt.Printf(err.Error())
-		return response
 	}
 
 	err = json.Unmarshal(body,&response)
@@ -132,7 +127,15 @@ func (src SchemaRegistryClient) GetVersions (subject string) []int {
 		fmt.Printf(err.Error())
 	}
 
-	return response
+	pkgSbj := SubjectWithVersions{
+		Subject:  subject,
+		Versions: response,
+	}
+
+	// Send back to retrieving thread
+	chanX <- pkgSbj
+	wg.Done()
+
 }
 
 func (src SchemaRegistryClient) IsImportModeReady () bool {
@@ -173,7 +176,7 @@ func (src SchemaRegistryClient) IsImportModeReady () bool {
 func (src SchemaRegistryClient) SetMode(modeToSet string) bool{
 	endpoint := src.SRUrl+"/mode"
 
-	mode := ImportMode{Mode: modeToSet}
+	mode := ModeRecord{Mode: modeToSet}
 	modeToSend, err := json.Marshal(mode)
 	if err != nil {
 		fmt.Printf(err.Error())
@@ -198,7 +201,7 @@ func (src SchemaRegistryClient) SetMode(modeToSet string) bool{
 
 }
 
-func (src SchemaRegistryClient) GetSchema (subject string, version int64) SchemaStringResponse {
+func (src SchemaRegistryClient) GetSchema (subject string, version int64) SchemaRecord {
 
 	endpoint := src.SRUrl+"/subjects/"+subject+"/versions/"+strconv.FormatInt(version,10)
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
@@ -214,12 +217,12 @@ func (src SchemaRegistryClient) GetSchema (subject string, version int64) Schema
 		fmt.Printf(errorMsg,body)
 	}
 
-	schemaResponse := new(SchemaStringResponse)
+	schemaResponse := new(SchemaRecord)
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		fmt.Printf(err.Error())
-		return SchemaStringResponse{}
+		return SchemaRecord{}
 	}
 
 	err = json.Unmarshal(body,&schemaResponse)
@@ -227,7 +230,7 @@ func (src SchemaRegistryClient) GetSchema (subject string, version int64) Schema
 		fmt.Printf(err.Error())
 	}
 
-	return SchemaStringResponse{Subject: schemaResponse.Subject,Schema: schemaResponse.Schema, Version: schemaResponse.Version, Id: schemaResponse.Id, SType: schemaResponse.SType}.setTypeIfEmpty()
+	return SchemaRecord{Subject: schemaResponse.Subject,Schema: schemaResponse.Schema, Version: schemaResponse.Version, Id: schemaResponse.Id, SType: schemaResponse.SType}.setTypeIfEmpty()
 }
 
 func (src SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion (schema string, subject string, id int, version int, SType string) io.ReadCloser {
@@ -259,7 +262,7 @@ func (src SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion (schema s
 // Deletes all schemas in the registry
 func (src SchemaRegistryClient) DeleteAllSubjectsPermanently (){
 	//Must perform soft delete before hard delete
-	for subject, versions := range inMemSchemas {
+	for subject, versions := range src.InMemSchemas {
 		for _ , version := range versions {
 			fmt.Println("Soft Deleting subject: " + subject + " version: " + strconv.FormatInt(int64(version),10))
 			endpoint := src.SRUrl+"/subjects/"+subject+"/versions/"+strconv.FormatInt(int64(version),10)
@@ -273,26 +276,26 @@ func (src SchemaRegistryClient) DeleteAllSubjectsPermanently (){
 				body, _ := ioutil.ReadAll(res.Body)
 				errorMsg := "Received status code " + strconv.FormatInt(int64(res.StatusCode),10) + " instead of 200 for "+ req.Method +" on " + endpoint
 				fmt.Printf(errorMsg,body)
+			} else {
+				// Hard delete Async
+				go src.performHardDelete(subject,version)
 			}
 		}
 	}
+}
 
-	//Hard delete
-	for subject, versions := range inMemSchemas {
-		for _ , version := range versions {
-			fmt.Println("Permanently deleting subject: " + subject + " version: " + strconv.FormatInt(int64(version),10))
-			endpoint := src.SRUrl+"/subjects/"+subject+"/versions/"+strconv.FormatInt(int64(version),10)+"?permanent=true"
-			req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret,nil)
-			res, err := httpClient.Do(req)
-			if err != nil {
-				fmt.Printf(err.Error())
-			}
+func (src SchemaRegistryClient) performHardDelete (subject string, version int){
+	fmt.Println("Permanently deleting subject: " + subject + " version: " + strconv.FormatInt(int64(version),10))
+	endpoint := src.SRUrl+"/subjects/"+subject+"/versions/"+strconv.FormatInt(int64(version),10)+"?permanent=true"
+	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret,nil)
+	res, err := httpClient.Do(req)
+	if err != nil {
+		fmt.Printf(err.Error())
+	}
 
-			if res.StatusCode != 200 {
-				body, _ := ioutil.ReadAll(res.Body)
-				errorMsg := "Received status code " + strconv.FormatInt(int64(res.StatusCode),10) + " instead of 200 for "+ req.Method +" on " + endpoint
-				fmt.Printf(errorMsg,body)
-			}
-		}
+	if res.StatusCode != 200 {
+		body, _ := ioutil.ReadAll(res.Body)
+		errorMsg := "Received status code " + strconv.FormatInt(int64(res.StatusCode),10) + " instead of 200 for "+ req.Method +" on " + endpoint
+		fmt.Printf(errorMsg,body)
 	}
 }

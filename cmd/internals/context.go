@@ -19,9 +19,12 @@ func GetFlags() {
 	flag.StringVar(&DestSRUrl, "dest-sr-url", "", "Url to the Source Schema Registry Cluster")
 	flag.StringVar(&DestSRKey, "dest-sr-key", "", "API KEY for the Destination Schema Registry Cluster")
 	flag.StringVar(&DestSRSecret, "dest-sr-secret", "", "API SECRET for the Destination Schema Registry Cluster")
-	flag.IntVar(&httpCallTimeout, "timeout", 60, "Timeout, in second, to use for all REST call with the Schema Registries")
+	flag.IntVar(&httpCallTimeout, "timeout", 60, "Timeout, in seconds, to use for all REST call with the Schema Registries")
+	flag.IntVar(&ScrapeInterval, "scrapeInterval", 60, "Amount of time ccloud-schema-exporter will delay between schema sync checks")
 	versionFlag := flag.Bool("version", false, "Print the current version and exit")
 	usageFlag := flag.Bool("usage", false, "Print the usage of this tool")
+	batchExportFlag := flag.Bool("batchExport", false, "Perform a one-time export of all schemas")
+	syncFlag := flag.Bool("sync", false, "Sync schemas continuously")
 	deleteFlag := flag.Bool("deleteAllFromDestination", false, "Setting this will run a delete on all schemas written to the destination registry")
 
 	flag.Parse()
@@ -42,6 +45,22 @@ func GetFlags() {
 		os.Exit(0)
 	}
 
+	if (!*syncFlag && !*batchExportFlag) {
+		fmt.Println("You must specify whether to run in batch or sync mode.")
+		fmt.Println("Usage:")
+		fmt.Println("")
+		flag.PrintDefaults()
+		os.Exit(0)
+	}
+
+	if (*batchExportFlag){
+		RunMode = "BATCH"
+	}
+
+	if (*syncFlag) {
+		RunMode = "SYNC"
+	}
+
 }
 
 func printVersion() {
@@ -50,7 +69,9 @@ func printVersion() {
 
 func deleteAll(sr string, key string, secret string){
 	destClient := NewSchemaRegistryClient(sr,key,secret, "dst")
-	destClient.GetSubjectsWithVersions()
+	aChan := make (chan map[string][]int, 1)
+	destClient.GetSubjectsWithVersions(aChan)
+	_ = <- aChan
 	destClient.DeleteAllSubjectsPermanently()
 }
 
