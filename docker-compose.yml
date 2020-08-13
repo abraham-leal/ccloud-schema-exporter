@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  ccloud-schema-exporter:
+    image: abrahamleal/ccloud-schema-exporter:latest
+    environment:
+      SRC_SR_URL: ${SRC_SR_URL}
+      SRC_API_KEY: ${SRC_API_KEY}
+      SRC_API_SECRET: ${SRC_API_SECRET}
+      DST_SR_URL: ${DST_SR_URL}
+      DST_API_KEY: ${DST_API_KEY}
+      DST_API_SECRET: ${DST_API_SECRET}

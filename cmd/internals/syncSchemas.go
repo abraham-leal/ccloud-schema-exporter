@@ -12,11 +12,22 @@ func Sync (srcClient SchemaRegistryClient, destClient SchemaRegistryClient) {
 	//Begin sync
 	for {
 		beginSync := time.Now()
-		srcSubjects := srcClient.GetSubjectsWithVersions()
-		destSubjects := destClient.GetSubjectsWithVersions()
 
-		if (!reflect.DeepEqual(destSubjects,srcSubjects)) {
-			fmt.Println("SRs not equal!")
+		srcSubjects := make (map[string][]int)
+		destSubjects := make (map[string][]int)
+
+		srcChan := make(chan map[string][]int)
+		destChan := make(chan map[string][]int)
+
+		go srcClient.GetSubjectsWithVersions(srcChan)
+		go destClient.GetSubjectsWithVersions(destChan)
+
+		srcSubjects = <- srcChan
+		destSubjects = <- destChan
+
+
+		if (!reflect.DeepEqual(srcSubjects,destSubjects)) {
+			fmt.Println("Source registry has values that Destination does not, syncing...")
 			diff := GetSubjectDiff(srcSubjects,destSubjects)
 			for subject, versions := range diff {
 				for _, v := range versions {

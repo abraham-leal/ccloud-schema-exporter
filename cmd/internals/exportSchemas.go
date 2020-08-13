@@ -6,7 +6,10 @@ import (
 )
 
 func BatchExport (srcClient SchemaRegistryClient, destClient SchemaRegistryClient) {
-	srcSubjects := srcClient.GetSubjectsWithVersions()
+
+	srcChan := make(chan map[string][]int)
+	go srcClient.GetSubjectsWithVersions(srcChan)
+	srcSubjects := <- srcChan
 
 	fmt.Println("Registering all schemas from " + srcClient.SRUrl)
 	for srcSubject , srcVersions := range srcSubjects {

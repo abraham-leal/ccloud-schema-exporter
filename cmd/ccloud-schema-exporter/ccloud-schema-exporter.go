@@ -19,15 +19,18 @@ func main() {
 	srcClient := client.NewSchemaRegistryClient(client.SrcSRUrl,client.SrcSRKey, client.SrcSRSecret , "src")
 	if (!srcClient.IsReachable()){
 		fmt.Println("Could not reach source registry. Possible bad credentials?")
-		os.Exit(0);
+		os.Exit(0)
 	}
 	destClient := client.NewSchemaRegistryClient(client.DestSRUrl, client.DestSRKey, client.DestSRSecret, "dst")
 	if (!destClient.IsReachable()){
 		fmt.Println("Could not reach destination registry. Possible bad credentials?")
-		os.Exit(0);
+		os.Exit(0)
 	}
 
-	destSubjects := destClient.GetSubjectsWithVersions()
+	destChan := make(chan map[string][]int)
+	go destClient.GetSubjectsWithVersions(destChan)
+	destSubjects := <- destChan
+	close(destChan)
 
 	if (len(destSubjects) != 0 && client.RunMode != "SYNC") {
 		fmt.Println("You have existing subjects registered in this registry, exporter cannot write schemas when " +

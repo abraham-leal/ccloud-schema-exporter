@@ -6,9 +6,10 @@ package client
 //
 
 type SchemaRegistryClient struct {
-	SRUrl string
-	SRApiKey string
-	SRApiSecret string
+	SRUrl        string
+	SRApiKey     string
+	SRApiSecret  string
+	InMemSchemas map[string][]int
 }
 
 type SchemaRecord struct {
@@ -44,4 +45,9 @@ type SchemaExtraction struct {
 
 type ModeRecord struct {
 	Mode string 	`json:"mode"`
+}
+
+type SubjectWithVersions struct {
+	Subject string
+	Versions []int
 }
