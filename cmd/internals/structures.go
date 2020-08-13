@@ -11,7 +11,7 @@ type SchemaRegistryClient struct {
 	SRApiSecret string
 }
 
-type SchemaStringResponse struct {
+type SchemaRecord struct {
 	Subject string `json:"subject"`
 	Schema string  `json:"schema"`
 	SType string   `json:"schemaType"`
@@ -20,7 +20,7 @@ type SchemaStringResponse struct {
 }
 
 //Constructor to assure Type-less schemas get registered with Avro
-func (srs SchemaStringResponse) setTypeIfEmpty () SchemaStringResponse {
+func (srs SchemaRecord) setTypeIfEmpty () SchemaRecord {
 	if (srs.SType == ""){
 		srs.SType = "AVRO"
 	}
@@ -42,6 +42,6 @@ type SchemaExtraction struct {
 	Subject string 	`json:"subject"`
 }
 
-type ImportMode struct {
+type ModeRecord struct {
 	Mode string 	`json:"mode"`
 }

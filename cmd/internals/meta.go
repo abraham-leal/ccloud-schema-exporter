@@ -5,10 +5,12 @@ package client
 // Author: Abraham Leal
 //
 
-import "net/http"
+import (
+	"net/http"
+)
 
 var httpCallTimeout int
-var scrapeInterval int
+var ScrapeInterval int
 var Version string = "0.1"
 var httpClient http.Client
 
@@ -18,4 +20,5 @@ var SrcSRSecret string
 var DestSRUrl string
 var DestSRKey string
 var DestSRSecret string
+var RunMode string
 

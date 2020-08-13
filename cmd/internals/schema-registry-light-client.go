@@ -25,7 +25,8 @@ func NewSchemaRegistryClient(SR string, API_KEY string, API_SECRET string, targe
 	if (SR == "" || API_KEY == "" || API_SECRET == "") {
 		if (target == "dst") {
 			client = SchemaRegistryClient{SRUrl: DestGetSRUrl(),SRApiKey: DestGetAPIKey(), SRApiSecret: DestGetAPISecret()}
-		} else {
+		}
+		if (target == "src"){
 			client = SchemaRegistryClient{SRUrl: SrcGetSRUrl(),SRApiKey: SrcGetAPIKey(), SRApiSecret: SrcGetAPISecret()}
 		}
 	} else {
@@ -51,20 +52,6 @@ func (src SchemaRegistryClient) IsReachable() bool {
 
 	if res.StatusCode == 200 {return true} else {return false}
 
-}
-
-func (src SchemaRegistryClient) GetSubjectsAsString() string {
-	endpoint := src.SRUrl+"/subjects"
-	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
-
-	res, err := httpClient.Do(req)
-	if err != nil {
-		fmt.Printf(err.Error())
-	}
-	body, _ := ioutil.ReadAll(res.Body)
-	bodyString := string(body)
-
-	return bodyString
 }
 
 func (src SchemaRegistryClient) GetSubjectsWithVersions() map[string][]int{
@@ -173,7 +160,7 @@ func (src SchemaRegistryClient) IsImportModeReady () bool {
 func (src SchemaRegistryClient) SetMode(modeToSet string) bool{
 	endpoint := src.SRUrl+"/mode"
 
-	mode := ImportMode{Mode: modeToSet}
+	mode := ModeRecord{Mode: modeToSet}
 	modeToSend, err := json.Marshal(mode)
 	if err != nil {
 		fmt.Printf(err.Error())
@@ -198,7 +185,7 @@ func (src SchemaRegistryClient) SetMode(modeToSet string) bool{
 
 }
 
-func (src SchemaRegistryClient) GetSchema (subject string, version int64) SchemaStringResponse {
+func (src SchemaRegistryClient) GetSchema (subject string, version int64) SchemaRecord {
 
 	endpoint := src.SRUrl+"/subjects/"+subject+"/versions/"+strconv.FormatInt(version,10)
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
@@ -214,12 +201,12 @@ func (src SchemaRegistryClient) GetSchema (subject string, version int64) Schema
 		fmt.Printf(errorMsg,body)
 	}
 
-	schemaResponse := new(SchemaStringResponse)
+	schemaResponse := new(SchemaRecord)
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		fmt.Printf(err.Error())
-		return SchemaStringResponse{}
+		return SchemaRecord{}
 	}
 
 	err = json.Unmarshal(body,&schemaResponse)
@@ -227,7 +214,7 @@ func (src SchemaRegistryClient) GetSchema (subject string, version int64) Schema
 		fmt.Printf(err.Error())
 	}
 
-	return SchemaStringResponse{Subject: schemaResponse.Subject,Schema: schemaResponse.Schema, Version: schemaResponse.Version, Id: schemaResponse.Id, SType: schemaResponse.SType}.setTypeIfEmpty()
+	return SchemaRecord{Subject: schemaResponse.Subject,Schema: schemaResponse.Schema, Version: schemaResponse.Version, Id: schemaResponse.Id, SType: schemaResponse.SType}.setTypeIfEmpty()
 }
 
 func (src SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion (schema string, subject string, id int, version int, SType string) io.ReadCloser {
