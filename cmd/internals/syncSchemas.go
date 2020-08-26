@@ -25,28 +25,52 @@ func Sync (srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
 		srcSubjects = <- srcChan
 		destSubjects = <- destChan
 
-
-		if (!reflect.DeepEqual(srcSubjects,destSubjects)) {
-			fmt.Println("Source registry has values that Destination does not, syncing...")
+		// Perform SR Sync without worrying about deletes
+		if !reflect.DeepEqual(srcSubjects,destSubjects) {
 			diff := GetSubjectDiff(srcSubjects,destSubjects)
-			for subject, versions := range diff {
-				for _, v := range versions {
-					schema := srcClient.GetSchema(subject, int64(v))
-					fmt.Println("Registering new schema: " + schema.Subject +
-						" with version: " + strconv.FormatInt(schema.Version, 10) +
-						" and ID: " + strconv.FormatInt(schema.Id, 10) +
-						" and Type: " + schema.SType)
-					destClient.RegisterSchemaBySubjectAndIDAndVersion(schema.Schema,
-						schema.Subject,
-						int(schema.Id),
-						int(schema.Version),
-						schema.SType)
+			if len(diff) != 0 {
+				fmt.Println("Source registry has values that Destination does not, syncing...")
+				for subject, versions := range diff {
+					for _, v := range versions {
+						fmt.Printf("Subject: %s, Version: %d", subject, v)
+						schema := srcClient.GetSchema(subject, int64(v))
+						fmt.Println("Registering new schema: " + schema.Subject +
+							" with version: " + strconv.FormatInt(schema.Version, 10) +
+							" and ID: " + strconv.FormatInt(schema.Id, 10) +
+							" and Type: " + schema.SType)
+						destClient.RegisterSchemaBySubjectAndIDAndVersion(schema.Schema,
+							schema.Subject,
+							int(schema.Id),
+							int(schema.Version),
+							schema.SType)
+					}
+				}
+			}
+
+			//Perform SR sync taking into account soft and hard deletes
+			if syncDeletes {
+				diff := GetSubjectDiff(destSubjects,srcSubjects)
+				if len(diff) != 0 {
+					fmt.Println("Source registry has deletes that Destination does not, syncing...")
+					for subject, versions := range diff {
+						for _, v := range versions {
+							fmt.Printf("Subject: %s, Version: %d", subject, v)
+
+							// Retrieve the known schema to be deleted
+							schema := destClient.GetSchema(subject, int64(v))
+							fmt.Println()
+							fmt.Printf("Soft deleting schema: %s with version: %d and ID: %d and Type: %s",
+								schema.Subject, schema.Version, schema.Id, schema.SType)
+							destClient.performSoftDelete(subject, v)
+						}
+					}
 				}
 			}
 		}
 
 		syncDuration := time.Since(beginSync)
-		fmt.Println("Finished sync in " + strconv.FormatInt(syncDuration.Milliseconds(),10) + " ms")
+		fmt.Println()
+		fmt.Printf("Finished sync in %d ms", syncDuration.Milliseconds())
 
 		time.Sleep(time.Duration(ScrapeInterval) * time.Second)
 	}
@@ -56,9 +80,12 @@ func Sync (srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
 func GetSubjectDiff ( m1 map[string][]int, m2 map[string][]int) map[string][]int {
 	diffMap := map[string][]int{}
 	for subject, versions := range m1 {
-		if (m2[subject] != nil) {
-			aDiff := GetVersionsDiff(m1[subject],m2[subject])
-			diffMap[subject] = aDiff
+		if m2[subject] != nil {
+			versionDiff := GetVersionsDiff(m1[subject],m2[subject])
+			if len(versionDiff) != 0 {
+				aDiff := versionDiff
+				diffMap[subject] = aDiff
+			}
 		} else {
 			diffMap[subject] = versions
 		}

@@ -8,7 +8,7 @@ This app supports two modes: `batchExport` and `sync`
 - `sync` will continuously sync newly registered schemas into the destination registry
 
 If you are looking to migrate schemas between On-Prem and Confluent Cloud, check out 
-[Confuent Replicator](https://docs.confluent.io/current/connect/kafka-connect-replicator/index.html).
+[Confluent Replicator](https://docs.confluent.io/current/connect/kafka-connect-replicator/index.html).
 
 The exporter expects the following variables to be set in the environment to make the necessary calls:
 
@@ -71,7 +71,7 @@ Usage of ./ccloud-schema-exporter:
   -dest-sr-url string
     	Url to the Destination Schema Registry Cluster
   -scrapeInterval int
-    	Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds(default 60)
+    	Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds (default 60)
   -src-sr-key string
     	API KEY for the Source Schema Registry Cluster
   -src-sr-secret string
@@ -80,19 +80,17 @@ Usage of ./ccloud-schema-exporter:
     	Url to the Source Schema Registry Cluster
   -sync
     	Sync schemas continuously
+  -syncDeletes
+    	Setting this will sync soft deletes from the source cluster to the destination
   -timeout int
-    	Timeout, in seconds, to use for all REST call with the Schema Registries (default 60)
+    	Timeout, in seconds, to use for all REST calls with the Schema Registries (default 60)
   -usage
     	Print the usage of this tool
   -version
     	Print the current version and exit
+
+
 ````
-
-#### Source Schema Deletion
-
-This application does *NOT* auto-delete schemas in the destination registry. This is to take a cautious approach to
-schema preservation. Operators should decide when a schema should be either soft or permanently deleted from any given 
-Schema Registry cluster.
 
 #### Example Usage 
 ````

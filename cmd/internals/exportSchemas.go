@@ -26,5 +26,4 @@ func BatchExport (srcClient *SchemaRegistryClient, destClient *SchemaRegistryCli
 				schema.SType)
 		}
 	}
-	
 }
