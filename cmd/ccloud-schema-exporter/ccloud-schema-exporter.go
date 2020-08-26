@@ -64,10 +64,10 @@ func main() {
 	}
 
 	if (client.RunMode == "SYNC") {
-		client.Sync(srcClient,destClient)
+		client.Sync(&srcClient,&destClient)
 	}
 	if (client.RunMode == "BATCH") {
-		client.BatchExport(srcClient,destClient)
+		client.BatchExport(&srcClient,&destClient)
 	}
 
 	fmt.Println("")

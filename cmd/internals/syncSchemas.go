@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func Sync (srcClient SchemaRegistryClient, destClient SchemaRegistryClient) {
+func Sync (srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
 
 	//Begin sync
 	for {

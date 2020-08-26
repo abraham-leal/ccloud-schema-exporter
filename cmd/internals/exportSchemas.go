@@ -5,7 +5,7 @@ import (
 	"strconv"
 )
 
-func BatchExport (srcClient SchemaRegistryClient, destClient SchemaRegistryClient) {
+func BatchExport (srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
 
 	srcChan := make(chan map[string][]int)
 	go srcClient.GetSubjectsWithVersions(srcChan)
