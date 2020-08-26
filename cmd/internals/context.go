@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"log"
 )
 
 func GetFlags() {
@@ -45,15 +46,15 @@ func GetFlags() {
 	}
 
 	if *deleteFlag{
-		fmt.Println("Deleting all schemas from DESTINATION registry")
+		log.Println("Deleting all schemas from DESTINATION registry")
 		deleteAll(DestSRUrl,DestSRKey,DestSRSecret)
 		os.Exit(0)
 	}
 
 	if !*syncFlag && !*batchExportFlag {
-		fmt.Println("You must specify whether to run in batch or sync mode.")
-		fmt.Println("Usage:")
-		fmt.Println("")
+		log.Println("You must specify whether to run in batch or sync mode.")
+		log.Println("Usage:")
+		log.Println("")
 		flag.PrintDefaults()
 		os.Exit(0)
 	}

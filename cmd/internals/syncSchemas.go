@@ -1,10 +1,10 @@
 package client
 
 import (
-	"fmt"
 	"reflect"
 	"strconv"
 	"time"
+	"log"
 )
 
 func Sync (srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
@@ -29,12 +29,12 @@ func Sync (srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
 		if !reflect.DeepEqual(srcSubjects,destSubjects) {
 			diff := GetSubjectDiff(srcSubjects,destSubjects)
 			if len(diff) != 0 {
-				fmt.Println("Source registry has values that Destination does not, syncing...")
+				log.Println("Source registry has values that Destination does not, syncing...")
 				for subject, versions := range diff {
 					for _, v := range versions {
-						fmt.Printf("Subject: %s, Version: %d", subject, v)
+						log.Printf("Subject: %s, Version: %d", subject, v)
 						schema := srcClient.GetSchema(subject, int64(v))
-						fmt.Println("Registering new schema: " + schema.Subject +
+						log.Println("Registering new schema: " + schema.Subject +
 							" with version: " + strconv.FormatInt(schema.Version, 10) +
 							" and ID: " + strconv.FormatInt(schema.Id, 10) +
 							" and Type: " + schema.SType)
@@ -51,15 +51,14 @@ func Sync (srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
 			if syncDeletes {
 				diff := GetSubjectDiff(destSubjects,srcSubjects)
 				if len(diff) != 0 {
-					fmt.Println("Source registry has deletes that Destination does not, syncing...")
+					log.Println("Source registry has deletes that Destination does not, syncing...")
 					for subject, versions := range diff {
 						for _, v := range versions {
-							fmt.Printf("Subject: %s, Version: %d", subject, v)
+							log.Printf("Subject: %s, Version: %d", subject, v)
 
 							// Retrieve the known schema to be deleted
 							schema := destClient.GetSchema(subject, int64(v))
-							fmt.Println()
-							fmt.Printf("Soft deleting schema: %s with version: %d and ID: %d and Type: %s",
+							log.Printf("Soft deleting schema: %s with version: %d and ID: %d and Type: %s",
 								schema.Subject, schema.Version, schema.Id, schema.SType)
 							destClient.performSoftDelete(subject, v)
 						}
@@ -69,8 +68,7 @@ func Sync (srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
 		}
 
 		syncDuration := time.Since(beginSync)
-		fmt.Println()
-		fmt.Printf("Finished sync in %d ms", syncDuration.Milliseconds())
+		log.Printf("Finished sync in %d ms", syncDuration.Milliseconds())
 
 		time.Sleep(time.Duration(ScrapeInterval) * time.Second)
 	}

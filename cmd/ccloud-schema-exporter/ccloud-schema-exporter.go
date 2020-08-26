@@ -18,12 +18,12 @@ func main() {
 
 	srcClient := client.NewSchemaRegistryClient(client.SrcSRUrl,client.SrcSRKey, client.SrcSRSecret , "src")
 	if (!srcClient.IsReachable()){
-		fmt.Println("Could not reach source registry. Possible bad credentials?")
+		log.Println("Could not reach source registry. Possible bad credentials?")
 		os.Exit(0)
 	}
 	destClient := client.NewSchemaRegistryClient(client.DestSRUrl, client.DestSRKey, client.DestSRSecret, "dst")
 	if (!destClient.IsReachable()){
-		fmt.Println("Could not reach destination registry. Possible bad credentials?")
+		log.Println("Could not reach destination registry. Possible bad credentials?")
 		os.Exit(0)
 	}
 
@@ -33,7 +33,7 @@ func main() {
 	close(destChan)
 
 	if (len(destSubjects) != 0 && client.RunMode != "SYNC") {
-		fmt.Println("You have existing subjects registered in this registry, exporter cannot write schemas when " +
+		log.Println("You have existing subjects registered in this registry, exporter cannot write schemas when " +
 			"previous schemas exist in batch mode.")
 		os.Exit(0)
 	}
@@ -54,11 +54,11 @@ func main() {
 		if (text == "Y") {
 			err := destClient.SetMode("IMPORT")
 			if err == false {
-				fmt.Println("Could not set destination registry to IMPORT ModeRecord.")
+				log.Println("Could not set destination registry to IMPORT ModeRecord.")
 				os.Exit(0)
 			}
 		} else {
-			fmt.Println("Cannot export schemas if destination is not set to IMPORT ModeRecord.")
+			log.Println("Cannot export schemas if destination is not set to IMPORT ModeRecord.")
 			os.Exit(0)
 		}
 	}
@@ -70,12 +70,12 @@ func main() {
 		client.BatchExport(srcClient,destClient)
 	}
 
-	fmt.Println("")
-	fmt.Println("-----------------------------------------------")
+	log.Println("")
+	log.Println("-----------------------------------------------")
 
-	fmt.Println("Resetting target to READWRITE")
+	log.Println("Resetting target to READWRITE")
 	destClient.SetMode("READWRITE")
 
-	fmt.Println("All Done! Thanks for using ccloud-schema-exporter!")
+	log.Println("All Done! Thanks for using ccloud-schema-exporter!")
 
 }
