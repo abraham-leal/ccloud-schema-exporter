@@ -2,7 +2,7 @@
 Exporter scripts for Confluent Schema Registry.
 
 A tool to export all schemas from a Confluent Cloud Schema Registry to another.
-This app supports two modes: `batchExport` and `sync`
+This app supports three modes: `batchExport`, `sync`, and `getLocalCopy`
 
 - `batchExport` will do a one time migration between schema registries, then it will reset the destination registry to `READWRTIE` mode.
 - `sync` will continuously sync newly registered schemas into the destination registry.
@@ -53,6 +53,9 @@ However, for stable images tag a release.
 - `./ccloud-schema-exporter -batchExport` : Running the app with this flag will perform a batch export.
 - `./ccloud-schema-exporter -sync` : Running the app with this flag will start a continuous sync 
 between source and destination schema registries.
+- `./ccloud-schema-exporter -getLocalCopy` : Running the app with this flag will get a snapshot of your Schema Registry
+into local files with naming structure subjectName-version-id.json per schema. The default directory is 
+currentPath/SchemaRegistryBackup/.
 
 When both flags are applied, `sync` mode prevails.
 
