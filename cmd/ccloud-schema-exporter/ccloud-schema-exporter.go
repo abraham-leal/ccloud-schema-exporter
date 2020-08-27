@@ -22,7 +22,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	if client.LocalCopy {
+	if client.RunMode == "LOCAL" {
 		client.WriteToFS(srcClient, client.PathToWrite)
 
 		log.Println("-----------------------------------------------")

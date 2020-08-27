@@ -2,7 +2,7 @@
 Exporter scripts for Confluent Schema Registry.
 
 A tool to export all schemas from a Confluent Cloud Schema Registry to another.
-This app supports three modes: `batchExport`, `sync`, and `getLocalCopy`
+This app supports three modes: `batchExport`, `sync`, and `getLocalCopy`.
 
 - `batchExport` will do a one time migration between schema registries, then it will reset the destination registry to `READWRTIE` mode.
 - `sync` will continuously sync newly registered schemas into the destination registry.
@@ -43,7 +43,7 @@ docker run \
 
 A sample docker-compose is also provided at the root of this directory.
 
-The docker image is built to handle the case of `-sync` continuous sync. For a one time export, it is recommended
+The docker image handles `-sync` continuous sync. For a one time export, it is recommended
 to use a release binary.
 
 For Docker, the `latest` tag will build directly from master. The master branch of this project is kept non-breaking;
@@ -54,10 +54,10 @@ However, for stable images tag a release.
 - `./ccloud-schema-exporter -sync` : Running the app with this flag will start a continuous sync 
 between source and destination schema registries.
 - `./ccloud-schema-exporter -getLocalCopy` : Running the app with this flag will get a snapshot of your Schema Registry
-into local files with naming structure subjectName-version-id.json per schema. The default directory is 
-currentPath/SchemaRegistryBackup/.
+into local files with naming structure subjectName-version-id per schema. The default directory is 
+{currentPath}/SchemaRegistryBackup/.
 
-When both flags are applied, `sync` mode prevails.
+When multiple flags are applied, prevalence is `sync` -> `batchExport` -> `getLocalCopy`
 
 ### Options
 
@@ -75,9 +75,9 @@ Usage of ./ccloud-schema-exporter:
   -dest-sr-url string
     	Url to the Destination Schema Registry Cluster
   -getLocalCopy
-    	Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path, but can be overridden by passing in a desired path with -getLocalCopyPath.
+    	Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path.
   -getLocalCopyPath string
-    	Optional custom path for local copy. This must be an absolute path.
+    	Optional custom path for local copy. This must be an existing directory.
   -scrapeInterval int
     	Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds (default 60)
   -src-sr-key string

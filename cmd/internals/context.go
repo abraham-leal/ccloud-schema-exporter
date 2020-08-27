@@ -22,14 +22,13 @@ func GetFlags() {
 	flag.StringVar(&DestSRSecret, "dest-sr-secret", "", "API SECRET for the Destination Schema Registry Cluster")
 	flag.IntVar(&httpCallTimeout, "timeout", 60, "Timeout, in seconds, to use for all REST calls with the Schema Registries")
 	flag.IntVar(&ScrapeInterval, "scrapeInterval", 60, "Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds")
-	flag.BoolVar(&LocalCopy, "getLocalCopy", false,
-		"Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path, but can be overridden by passing in a desired path with -getLocalCopyPath.")
 	flag.StringVar(&PathToWrite, "getLocalCopyPath", "",
-		"Optional custom path for local copy. This must be an absolute path with existing directory structure.")
+		"Optional custom path for local copy. This must be an existing directory structure.")
 	versionFlag := flag.Bool("version", false, "Print the current version and exit")
 	usageFlag := flag.Bool("usage", false, "Print the usage of this tool")
 	batchExportFlag := flag.Bool("batchExport", false, "Perform a one-time export of all schemas")
 	syncFlag := flag.Bool("sync", false, "Sync schemas continuously")
+	localCopyFlag := flag.Bool("getLocalCopy", false, "Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path")
 	deleteFlag := flag.Bool("deleteAllFromDestination", false, "Setting this will run a delete on all schemas written to the destination registry")
 	syncDeletesFlag := flag.Bool("syncDeletes", false, "Setting this will sync soft deletes from the source cluster to the destination")
 
@@ -55,12 +54,16 @@ func GetFlags() {
 		os.Exit(0)
 	}
 
-	if !*syncFlag && !*batchExportFlag && !LocalCopy {
+	if !*syncFlag && !*batchExportFlag && !*localCopyFlag {
 		fmt.Println("You must specify a mode to run on.")
 		fmt.Println("Usage:")
 		fmt.Println("")
 		flag.PrintDefaults()
 		os.Exit(0)
+	}
+
+	if *localCopyFlag {
+		RunMode = "LOCAL"
 	}
 
 	if *batchExportFlag {

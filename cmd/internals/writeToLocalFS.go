@@ -10,10 +10,24 @@ import (
 
 func WriteToFS (srcClient *SchemaRegistryClient, definedPath string) {
 
-	abspath, _ := os.Executable()
+	currentPath, _ := os.Executable()
+
 	if definedPath == "" {
+		log.Println("Path not defined, writing to new local folder SchemaRegistryBackup")
 		_ = os.Mkdir("SchemaRegistryBackup", 0755)
-		definedPath = fmt.Sprintf("%s%s",filepath.Dir(abspath),"/SchemaRegistryBackup")
+		definedPath = filepath.Join(filepath.Dir(currentPath), "SchemaRegistryBackup")
+	} else {
+		if filepath.IsAbs(definedPath){
+			if _, err := os.Stat(definedPath); os.IsNotExist(err) {
+				log.Fatalln("The directory specified does not exist.")
+			}
+		} else {
+			definedPath = filepath.Join(filepath.Dir(currentPath),definedPath)
+			_, err := os.Stat(definedPath)
+			if os.IsNotExist(err) {
+				log.Fatalln("The directory specified does not exist.")
+			}
+		}
 	}
 
 	srcChan := make(chan map[string][]int)
@@ -35,10 +49,12 @@ func writeSchema (srcClient *SchemaRegistryClient, pathToWrite string, subject s
 	rawSchema := srcClient.GetSchema(subject,int64(version))
 
 
-	log.Printf("Writing schema: %s with version: %d and ID: %d and Type: %s",
-		rawSchema.Subject, rawSchema.Version, rawSchema.Id, rawSchema.SType)
+	log.Printf("Writing schema: %s with version: %d and ID: %d",
+		rawSchema.Subject, rawSchema.Version, rawSchema.Id)
 
-	f , err := os.Create(fmt.Sprintf("%s/%s-%d-%d.json",pathToWrite,rawSchema.Subject,rawSchema.Version,rawSchema.Id))
+	filename := fmt.Sprintf("%s-%d-%d",rawSchema.Subject, rawSchema.Version, rawSchema.Id)
+	f , err := os.Create(filepath.Join(pathToWrite,filename))
+
 	check(err)
 	defer f.Close()
 

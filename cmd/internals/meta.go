@@ -23,4 +23,3 @@ var DestSRSecret string
 var RunMode string
 var syncDeletes bool
 var PathToWrite string
-var LocalCopy bool
