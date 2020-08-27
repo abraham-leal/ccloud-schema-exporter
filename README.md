@@ -64,7 +64,7 @@ When both flags are applied, `sync` mode prevails.
 ````
 Usage of ./ccloud-schema-exporter:
 
--batchExport
+  -batchExport
     	Perform a one-time export of all schemas
   -deleteAllFromDestination
     	Setting this will run a delete on all schemas written to the destination registry
