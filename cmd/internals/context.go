@@ -8,8 +8,8 @@ package client
 import (
 	"flag"
 	"fmt"
-	"os"
 	"log"
+	"os"
 )
 
 func GetFlags() {
@@ -22,6 +22,10 @@ func GetFlags() {
 	flag.StringVar(&DestSRSecret, "dest-sr-secret", "", "API SECRET for the Destination Schema Registry Cluster")
 	flag.IntVar(&httpCallTimeout, "timeout", 60, "Timeout, in seconds, to use for all REST calls with the Schema Registries")
 	flag.IntVar(&ScrapeInterval, "scrapeInterval", 60, "Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds")
+	flag.BoolVar(&LocalCopy, "getLocalCopy", false,
+		"Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path, but can be overridden by passing in a desired path with -getLocalCopyPath.")
+	flag.StringVar(&PathToWrite, "getLocalCopyPath", "",
+		"Optional custom path for local copy. This must be an absolute path with existing directory structure.")
 	versionFlag := flag.Bool("version", false, "Print the current version and exit")
 	usageFlag := flag.Bool("usage", false, "Print the usage of this tool")
 	batchExportFlag := flag.Bool("batchExport", false, "Perform a one-time export of all schemas")
@@ -51,10 +55,10 @@ func GetFlags() {
 		os.Exit(0)
 	}
 
-	if !*syncFlag && !*batchExportFlag {
-		log.Println("You must specify whether to run in batch or sync mode.")
-		log.Println("Usage:")
-		log.Println("")
+	if !*syncFlag && !*batchExportFlag && !LocalCopy {
+		fmt.Println("You must specify a mode to run on.")
+		fmt.Println("Usage:")
+		fmt.Println("")
 		flag.PrintDefaults()
 		os.Exit(0)
 	}

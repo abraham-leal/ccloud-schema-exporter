@@ -21,6 +21,16 @@ func main() {
 		log.Println("Could not reach source registry. Possible bad credentials?")
 		os.Exit(0)
 	}
+
+	if client.LocalCopy {
+		client.WriteToFS(srcClient, client.PathToWrite)
+
+		log.Println("-----------------------------------------------")
+		log.Println("All Done! Thanks for using ccloud-schema-exporter!")
+
+		os.Exit(0)
+	}
+
 	destClient := client.NewSchemaRegistryClient(client.DestSRUrl, client.DestSRKey, client.DestSRSecret, "dst")
 	if (!destClient.IsReachable()){
 		log.Println("Could not reach destination registry. Possible bad credentials?")
@@ -70,7 +80,6 @@ func main() {
 		client.BatchExport(srcClient,destClient)
 	}
 
-	log.Println("")
 	log.Println("-----------------------------------------------")
 
 	log.Println("Resetting target to READWRITE")
