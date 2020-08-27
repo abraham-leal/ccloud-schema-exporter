@@ -5,7 +5,8 @@ A tool to export all schemas from a Confluent Cloud Schema Registry to another.
 This app supports two modes: `batchExport` and `sync`
 
 - `batchExport` will do a one time migration between schema registries, then it will reset the destination registry to `READWRTIE` mode.
-- `sync` will continuously sync newly registered schemas into the destination registry
+- `sync` will continuously sync newly registered schemas into the destination registry.
+- `getLocalCopy` will fetch and write local copies of Schema Registry's Schemas.
 
 If you are looking to migrate schemas between On-Prem and Confluent Cloud, check out 
 [Confluent Replicator](https://docs.confluent.io/current/connect/kafka-connect-replicator/index.html).
@@ -60,7 +61,7 @@ When both flags are applied, `sync` mode prevails.
 ````
 Usage of ./ccloud-schema-exporter:
 
-  -batchExport
+-batchExport
     	Perform a one-time export of all schemas
   -deleteAllFromDestination
     	Setting this will run a delete on all schemas written to the destination registry
@@ -70,6 +71,10 @@ Usage of ./ccloud-schema-exporter:
     	API SECRET for the Destination Schema Registry Cluster
   -dest-sr-url string
     	Url to the Destination Schema Registry Cluster
+  -getLocalCopy
+    	Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path, but can be overridden by passing in a desired path with -getLocalCopyPath.
+  -getLocalCopyPath string
+    	Optional custom path for local copy. This must be an absolute path.
   -scrapeInterval int
     	Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds (default 60)
   -src-sr-key string
@@ -89,7 +94,6 @@ Usage of ./ccloud-schema-exporter:
   -version
     	Print the current version and exit
 
-
 ````
 
 #### Example Usage 
@@ -100,7 +104,7 @@ export SRC_API_SECRET=XXXX
 export DST_SR_URL=XXXX
 export DST_API_KEY=XXXX
 export DST_API_SECRET=XXXX
-./ccloud-schema-exporter <-sync | -batchExport>
+./ccloud-schema-exporter <-sync | -batchExport | -getLocalCopy>
 ````
 
 
