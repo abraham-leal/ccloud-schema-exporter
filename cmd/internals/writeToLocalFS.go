@@ -19,12 +19,14 @@ func WriteToFS (srcClient *SchemaRegistryClient, definedPath string) {
 	} else {
 		if filepath.IsAbs(definedPath){
 			if _, err := os.Stat(definedPath); os.IsNotExist(err) {
+				log.Println("Path: " + definedPath)
 				log.Fatalln("The directory specified does not exist.")
 			}
 		} else {
 			definedPath = filepath.Join(filepath.Dir(currentPath),definedPath)
 			_, err := os.Stat(definedPath)
 			if os.IsNotExist(err) {
+				log.Println("Path: " + definedPath)
 				log.Fatalln("The directory specified does not exist.")
 			}
 		}

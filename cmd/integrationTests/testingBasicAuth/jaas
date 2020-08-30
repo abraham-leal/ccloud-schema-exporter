@@ -1,0 +1,10 @@
+test {
+  org.eclipse.jetty.jaas.spi.PropertyFileLoginModule required
+  file="/testing/testUsers"
+  debug="false";
+};
+
+
+
+
+

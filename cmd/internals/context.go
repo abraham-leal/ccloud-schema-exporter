@@ -35,7 +35,7 @@ func GetFlags() {
 	flag.Parse()
 
 	if *syncDeletesFlag {
-		syncDeletes = true
+		SyncDeletes = true
 	}
 
 	if *versionFlag {

@@ -46,7 +46,7 @@ func (src *SchemaRegistryClient) IsReachable() bool {
 
 	res, err := httpClient.Do(req)
 	if err != nil {
-		log.Printf(err.Error())
+		log.Fatalln(err.Error())
 	}
 
 	if res.StatusCode == 200 {return true} else {return false}
@@ -59,7 +59,7 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[strin
 
 	res, err := httpClient.Do(req)
 	if err != nil {
-		log.Printf(err.Error())
+		log.Fatalln(err.Error())
 	}
 
 	if res.StatusCode != 200 {
@@ -81,10 +81,10 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[strin
 	}
 
 	var aGroup sync.WaitGroup
-	aGroup.Add(len(response))
 	aChan := make(chan SubjectWithVersions, 1000)
 
 	for _, s := range response {
+		aGroup.Add(1)
 		go src.GetVersions(s, aChan, &aGroup)
 	}
 
@@ -264,15 +264,15 @@ func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently (){
 	//Must perform soft delete before hard delete
 	for subject, versions := range src.InMemSchemas {
 		for _ , version := range versions {
-			if src.performSoftDelete(subject, version) {
+			if src.PerformSoftDelete(subject, version) {
 				// Hard delete Async
-				go src.performHardDelete(subject, version)
+				go src.PerformHardDelete(subject, version)
 			}
 		}
 	}
 }
 
-func (src *SchemaRegistryClient) performSoftDelete (subject string, version int) bool {
+func (src *SchemaRegistryClient) PerformSoftDelete(subject string, version int) bool {
 	log.Println("Soft Deleting subject: " + subject + " version: " + strconv.FormatInt(int64(version),10))
 	endpoint := src.SRUrl+"/subjects/"+subject+"/versions/"+strconv.FormatInt(int64(version),10)
 	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret,nil)
@@ -290,7 +290,7 @@ func (src *SchemaRegistryClient) performSoftDelete (subject string, version int)
 	return true
 }
 
-func (src *SchemaRegistryClient) performHardDelete (subject string, version int){
+func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int){
 	log.Println("Permanently deleting subject: " + subject + " version: " + strconv.FormatInt(int64(version),10))
 	endpoint := src.SRUrl+"/subjects/"+subject+"/versions/"+strconv.FormatInt(int64(version),10)+"?permanent=true"
 	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret,nil)

@@ -11,6 +11,9 @@ func Sync (srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
 
 	//Begin sync
 	for {
+		if TestHarnessRun == true {
+			return
+		}
 		beginSync := time.Now()
 
 		srcSubjects := make (map[string][]int)
@@ -48,19 +51,15 @@ func Sync (srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
 			}
 
 			//Perform SR sync taking into account soft and hard deletes
-			if syncDeletes {
+			if SyncDeletes {
 				diff := GetSubjectDiff(destSubjects,srcSubjects)
 				if len(diff) != 0 {
 					log.Println("Source registry has deletes that Destination does not, syncing...")
 					for subject, versions := range diff {
 						for _, v := range versions {
-							log.Printf("Subject: %s, Version: %d", subject, v)
-
 							// Retrieve the known schema to be deleted
-							schema := destClient.GetSchema(subject, int64(v))
-							log.Printf("Soft deleting schema: %s with version: %d and ID: %d and Type: %s",
-								schema.Subject, schema.Version, schema.Id, schema.SType)
-							destClient.performSoftDelete(subject, v)
+							//schema := destClient.GetSchema(subject, int64(v)) We might need this later to support hard deletes
+							destClient.PerformSoftDelete(subject, v)
 						}
 					}
 				}
