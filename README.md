@@ -1,5 +1,7 @@
 # Schema Exporter for Confluent Cloud
 
+[![Build](https://travis-ci.com/abraham-leal/ccloud-schema-exporter.svg?branch=master)]()
+
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=abraham-leal_ccloud-schema-exporter&metric=alert_status)](https://sonarcloud.io/dashboard?id=abraham-leal_ccloud-schema-exporter)
 
 A tool to export all schemas from a Confluent Cloud Schema Registry to another.
