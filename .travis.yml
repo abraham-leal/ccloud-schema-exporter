@@ -14,6 +14,7 @@ script:
   - docker pull confluentinc/cp-server:5.5.1
   - docker pull confluentinc/cp-schema-registry:5.5.1
   - cd cmd/integrationTests
+  - docker-compose up -d
   - go test
   - cd ../internals
   - go test
