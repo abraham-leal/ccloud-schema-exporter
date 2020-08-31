@@ -16,11 +16,15 @@ import (
 	"sync"
 	"time"
 )
-
+/**
+Creates a lightweight client to schema registry in order to handle the necessary operations
+for syncing schema registries. Comes with helped methods for deletions that are exported.
+All functions are methods of SchemaRegistryClient
+ */
 func NewSchemaRegistryClient(SR string, apiKey string, apiSecret string, target string) *SchemaRegistryClient {
 	client := SchemaRegistryClient{}
 
-	// If the paramethers are empty, go fetch from env
+	// If the parameters are empty, go fetch from env
 	if (SR == "" || apiKey == "" || apiSecret == "") {
 		if (target == "dst") {
 			client = SchemaRegistryClient{SRUrl: DestGetSRUrl(),SRApiKey: DestGetAPIKey(), SRApiSecret: DestGetAPISecret(), InMemSchemas: map[string][]int{}}
