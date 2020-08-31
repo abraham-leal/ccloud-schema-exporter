@@ -11,7 +11,7 @@ services:
 
 script:
   - docker pull confluentinc/cp-zookeeper:5.5.1
-  - docker pull confluentinc/cp-kafka:5.5.1
+  - docker pull confluentinc/cp-server:5.5.1
   - docker pull confluentinc/cp-schema-registry:5.5.1
   - cd cmd/integrationTests
   - go test
