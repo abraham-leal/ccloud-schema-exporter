@@ -8,20 +8,20 @@ package client
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
-	"log"
 )
 
-func NewSchemaRegistryClient(SR string, API_KEY string, API_SECRET string, target string) *SchemaRegistryClient {
+func NewSchemaRegistryClient(SR string, apiKey string, apiSecret string, target string) *SchemaRegistryClient {
 	client := SchemaRegistryClient{}
 
 	// If the paramethers are empty, go fetch from env
-	if (SR == "" || API_KEY == "" || API_SECRET == "") {
+	if (SR == "" || apiKey == "" || apiSecret == "") {
 		if (target == "dst") {
 			client = SchemaRegistryClient{SRUrl: DestGetSRUrl(),SRApiKey: DestGetAPIKey(), SRApiSecret: DestGetAPISecret(), InMemSchemas: map[string][]int{}}
 		}
@@ -30,7 +30,7 @@ func NewSchemaRegistryClient(SR string, API_KEY string, API_SECRET string, targe
 		}
 	} else {
 		// Enables passing in the vars through flags
-		client = SchemaRegistryClient{SRUrl: SR,SRApiKey: API_KEY, SRApiSecret: API_SECRET, InMemSchemas: map[string][]int{}}
+		client = SchemaRegistryClient{SRUrl: SR,SRApiKey: apiKey, SRApiSecret: apiSecret, InMemSchemas: map[string][]int{}}
 	}
 
 	httpClient = http.Client{
@@ -54,19 +54,15 @@ func (src *SchemaRegistryClient) IsReachable() bool {
 }
 
 func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[string][]int) {
-	endpoint := src.SRUrl+"/subjects"
+	src.InMemSchemas = make(map[string][]int)
+	endpoint := fmt.Sprintf("%s/subjects",src.SRUrl)
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
-
-	if res.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(res.Body)
-		errorMsg := "Received status code " + strconv.FormatInt(int64(res.StatusCode),10) + " instead of 200 for "+ req.Method +" on " + endpoint
-		log.Printf(errorMsg,body)
-	}
+	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
 	response :=  []string{}
 
@@ -101,19 +97,14 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[strin
 }
 
 func (src *SchemaRegistryClient) GetVersions (subject string, chanX chan <- SubjectWithVersions, wg *sync.WaitGroup) {
-	endpoint := src.SRUrl+"/subjects/"+subject+"/versions"
+	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl,subject)
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
 	}
-
-	if res.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(res.Body)
-		errorMsg := "Received status code " + strconv.FormatInt(int64(res.StatusCode),10) + " instead of 200 for "+ req.Method +" on " + endpoint
-		log.Printf(errorMsg,body)
-	}
+	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
 	response :=  []int{}
 
@@ -139,19 +130,14 @@ func (src *SchemaRegistryClient) GetVersions (subject string, chanX chan <- Subj
 }
 
 func (src *SchemaRegistryClient) IsImportModeReady () bool {
-	endpoint := src.SRUrl+"/mode"
+	endpoint := fmt.Sprintf("%s/mode",src.SRUrl)
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
 	}
-
-	if res.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(res.Body)
-		errorMsg := "Received status code " + strconv.FormatInt(int64(res.StatusCode),10) + " instead of 200 for "+ req.Method +" on " + endpoint
-		log.Printf(errorMsg,body)
-	}
+	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
 	response := map[string]string{}
 
@@ -174,7 +160,7 @@ func (src *SchemaRegistryClient) IsImportModeReady () bool {
 }
 
 func (src *SchemaRegistryClient) SetMode(modeToSet string) bool{
-	endpoint := src.SRUrl+"/mode"
+	endpoint := fmt.Sprintf("%s/mode",src.SRUrl)
 
 	mode := ModeRecord{Mode: modeToSet}
 	modeToSend, err := json.Marshal(mode)
@@ -188,12 +174,7 @@ func (src *SchemaRegistryClient) SetMode(modeToSet string) bool{
 	if err != nil {
 		log.Printf(err.Error())
 	}
-
-	if res.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(res.Body)
-		errorMsg := "Received status code " + strconv.FormatInt(int64(res.StatusCode),10) + " instead of 200 for "+ req.Method +" on " + endpoint
-		log.Printf(errorMsg,body)
-	}
+	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
 	if (res.StatusCode == 200) {
 		return true
@@ -202,20 +183,14 @@ func (src *SchemaRegistryClient) SetMode(modeToSet string) bool{
 }
 
 func (src *SchemaRegistryClient) GetSchema (subject string, version int64) SchemaRecord {
-
-	endpoint := src.SRUrl+"/subjects/"+subject+"/versions/"+strconv.FormatInt(version,10)
+	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d",src.SRUrl,subject,version)
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
 	}
-
-	if res.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(res.Body)
-		errorMsg := "Received status code " + strconv.FormatInt(int64(res.StatusCode),10) + " instead of 200 for "+ req.Method +" on " + endpoint
-		log.Printf(errorMsg,body)
-	}
+	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
 	schemaResponse := new(SchemaRecord)
 
@@ -234,7 +209,7 @@ func (src *SchemaRegistryClient) GetSchema (subject string, version int64) Schem
 }
 
 func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion (schema string, subject string, id int, version int, SType string) io.ReadCloser {
-	endpoint := src.SRUrl+"/subjects/"+subject+"/versions"
+	endpoint := fmt.Sprintf("%s/subjects/%s/versions",src.SRUrl,subject)
 
 	schemaRequest := SchemaToRegister{Schema: schema, Id: id, Version: version, SType: SType}
 	schemaJSON, err := json.Marshal(schemaRequest)
@@ -248,12 +223,7 @@ func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion (schema 
 	if err != nil {
 		log.Printf(err.Error())
 	}
-
-	if res.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(res.Body)
-		errorMsg := "Received status code " + strconv.FormatInt(int64(res.StatusCode),10) + " instead of 200 for "+ req.Method +" on " + endpoint
-		log.Printf(errorMsg,body)
-	}
+	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
 
 	return res.Body
@@ -261,11 +231,15 @@ func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion (schema 
 
 // Deletes all schemas in the registry
 func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently (){
+	destSubjects := make (map[string][]int)
+	destChan := make(chan map[string][]int)
+	go src.GetSubjectsWithVersions(destChan)
+	destSubjects = <- destChan
+
 	//Must perform soft delete before hard delete
-	for subject, versions := range src.InMemSchemas {
+	for subject, versions := range destSubjects {
 		for _ , version := range versions {
 			if src.PerformSoftDelete(subject, version) {
-				// Hard delete Async
 				go src.PerformHardDelete(subject, version)
 			}
 		}
@@ -273,35 +247,43 @@ func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently (){
 }
 
 func (src *SchemaRegistryClient) PerformSoftDelete(subject string, version int) bool {
-	log.Println("Soft Deleting subject: " + subject + " version: " + strconv.FormatInt(int64(version),10))
-	endpoint := src.SRUrl+"/subjects/"+subject+"/versions/"+strconv.FormatInt(int64(version),10)
+	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d",src.SRUrl,subject,version)
 	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret,nil)
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
 	}
-
-	if res.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(res.Body)
-		errorMsg := "Received status code " + strconv.FormatInt(int64(res.StatusCode),10) + " instead of 200 for "+ req.Method +" on " + endpoint
-		log.Printf(errorMsg,body)
+	if res.StatusCode == 200 {
+		log.Println(fmt.Sprintf("Soft deleted subject: %s, version: %d", subject,version))
+	} else {
+		handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 		return false
 	}
 	return true
 }
 
-func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int){
-	log.Println("Permanently deleting subject: " + subject + " version: " + strconv.FormatInt(int64(version),10))
-	endpoint := src.SRUrl+"/subjects/"+subject+"/versions/"+strconv.FormatInt(int64(version),10)+"?permanent=true"
+func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int) bool {
+	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d?permanent=true",src.SRUrl,subject,version)
 	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret,nil)
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
 	}
-
-	if res.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(res.Body)
-		errorMsg := "Received status code " + strconv.FormatInt(int64(res.StatusCode),10) + " instead of 200 for "+ req.Method +" on " + endpoint
-		log.Printf(errorMsg,body)
+	if res.StatusCode == 200 {
+		log.Println(fmt.Sprintf("Hard deleted subject: %s, version: %d", subject,version))
+	} else {
+		handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
+		return false
 	}
+	return true
+}
+
+func handleNotSuccess (body io.Reader, statusCode int, method string, endpoint string){
+	statusError := "Received status code %d instead of 200 for %s, on %s"
+	if statusCode != 200 {
+		body, _ := ioutil.ReadAll(body)
+		errorMsg := fmt.Sprintf(statusError, statusCode, method, endpoint)
+		log.Printf("ERROR: %s, HTTP Response: %s",errorMsg, string(body))
+	}
+
 }

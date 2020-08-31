@@ -82,9 +82,6 @@ func printVersion() {
 
 func deleteAll(sr string, key string, secret string){
 	destClient := NewSchemaRegistryClient(sr,key,secret, "dst")
-	aChan := make (chan map[string][]int, 1)
-	destClient.GetSubjectsWithVersions(aChan)
-	_ = <- aChan
 	destClient.DeleteAllSubjectsPermanently()
 }
 

@@ -1,5 +1,6 @@
 # Schema Exporter for Confluent Cloud
-Exporter scripts for Confluent Schema Registry.
+
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=abraham-leal_ccloud-schema-exporter&metric=alert_status)](https://sonarcloud.io/dashboard?id=abraham-leal_ccloud-schema-exporter)
 
 A tool to export all schemas from a Confluent Cloud Schema Registry to another.
 This app supports three modes: `batchExport`, `sync`, and `getLocalCopy`.
