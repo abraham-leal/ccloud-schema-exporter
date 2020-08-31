@@ -18,7 +18,6 @@ script:
   - go test
   - cd ../internals
   - go test
-  - sonar-scanner
 
 addons:
   sonarcloud:
