@@ -21,6 +21,8 @@ Creates a lightweight client to schema registry in order to handle the necessary
 for syncing schema registries. Comes with helped methods for deletions that are exported.
 All functions are methods of SchemaRegistryClient
  */
+
+var statusError = "Received status code %d instead of 200 for %s, on %s"
 func NewSchemaRegistryClient(SR string, apiKey string, apiSecret string, target string) *SchemaRegistryClient {
 	client := SchemaRegistryClient{}
 
@@ -257,13 +259,8 @@ func (src *SchemaRegistryClient) PerformSoftDelete(subject string, version int) 
 	if err != nil {
 		log.Printf(err.Error())
 	}
-	if res.StatusCode == 200 {
-		log.Println(fmt.Sprintf("Soft deleted subject: %s, version: %d", subject,version))
-	} else {
-		handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
-		return false
-	}
-	return true
+
+	return handleDeletes(res.Body, res.StatusCode, req.Method, endpoint, "Soft", subject, version)
 }
 
 func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int) bool {
@@ -273,21 +270,27 @@ func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int) 
 	if err != nil {
 		log.Printf(err.Error())
 	}
-	if res.StatusCode == 200 {
-		log.Println(fmt.Sprintf("Hard deleted subject: %s, version: %d", subject,version))
+
+	return handleDeletes(res.Body, res.StatusCode, req.Method, endpoint, "Hard", subject, version)
+}
+
+func handleDeletes (body io.Reader, statusCode int, method string, endpoint string,
+	reqType string, subject string, version int) bool {
+	if statusCode != 200 {
+		body, _ := ioutil.ReadAll(body)
+		errorMsg := fmt.Sprintf(statusError, statusCode, method, endpoint)
+		log.Printf("ERROR: %s, HTTP Response: %s",errorMsg, string(body))
 	} else {
-		handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
+		log.Println(fmt.Sprintf("%s deleted subject: %s, version: %d", reqType, subject, version))
 		return false
 	}
 	return true
 }
 
 func handleNotSuccess (body io.Reader, statusCode int, method string, endpoint string){
-	statusError := "Received status code %d instead of 200 for %s, on %s"
 	if statusCode != 200 {
 		body, _ := ioutil.ReadAll(body)
 		errorMsg := fmt.Sprintf(statusError, statusCode, method, endpoint)
 		log.Printf("ERROR: %s, HTTP Response: %s",errorMsg, string(body))
 	}
-
 }
