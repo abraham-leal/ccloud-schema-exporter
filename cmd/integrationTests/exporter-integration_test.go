@@ -191,9 +191,7 @@ func TestSyncMode(t *testing.T) {
 	destSubjects = <- destChan
 
 	log.Println("Testing initial sync")
-
-	log.Printf("Source subject-version mapping contents: %v",srcSubjects)
-	log.Printf("Source subject-version mapping contents: %v",destSubjects)
+	printSubjectTestResult(srcSubjects, destSubjects)
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
 
@@ -222,9 +220,7 @@ func TestSyncMode(t *testing.T) {
 
 	srcSubjects = <- srcChan
 	destSubjects = <- destChan
-
-	log.Printf("Source subject-version mapping contents: %v",srcSubjects)
-	log.Printf("Source subject-version mapping contents: %v",destSubjects)
+	printSubjectTestResult(srcSubjects, destSubjects)
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
 
@@ -241,9 +237,7 @@ func TestSyncMode(t *testing.T) {
 
 	srcSubjects = <- srcChan
 	destSubjects = <- destChan
-
-	log.Printf("Source subject-version mapping contents: %v",srcSubjects)
-	log.Printf("Source subject-version mapping contents: %v",destSubjects)
+	printSubjectTestResult(srcSubjects, destSubjects)
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
 
@@ -255,11 +249,17 @@ func TestSyncMode(t *testing.T) {
 
 	// Assert schemas in dest deep equal schemas in src
 
-	srcIDs :=  testClientSrc.GetAllIDs()
-	dstIDs :=  testClientDst.GetAllIDs()
+	aChan := make(chan map[int64]map[string]int64)
+	bChan := make(chan map[int64]map[string]int64)
+	srcIDs := make(map[int64]map[string]int64)
+	dstIDs := make(map[int64]map[string]int64)
 
-	log.Printf("Source IDs contents: %v", srcIDs)
-	log.Printf("Destination IDs contents: %v", dstIDs)
+	go testClientSrc.GetAllIDs(aChan)
+	go testClientDst.GetAllIDs(bChan)
+
+	srcIDs = <- aChan
+	dstIDs = <- bChan
+	printIDTestResult(srcIDs, dstIDs)
 
 	assert.True(t, reflect.DeepEqual(srcIDs, dstIDs))
 
@@ -277,35 +277,38 @@ func TestSyncMode(t *testing.T) {
 		newRegister.Subject,newRegister.Id,newRegister.Version,newRegister.SType)
 	time.Sleep(time.Duration(3) * time.Second) // Give time for sync
 
-	srcIDs =  testClientSrc.GetAllIDs()
-	dstIDs =  testClientDst.GetAllIDs()
+	go testClientSrc.GetAllIDs(aChan)
+	go testClientDst.GetAllIDs(bChan)
 
-	log.Printf("Source IDs contents: %v", srcIDs)
-	log.Printf("Destination IDs contents: %v", dstIDs)
+	srcIDs = <- aChan
+	dstIDs = <- bChan
+	printIDTestResult(srcIDs, dstIDs)
 
 	// inject a hard delete
 	testClientSrc.PerformSoftDelete(testingSubject1,4)
 	testClientSrc.PerformHardDelete(testingSubject1,4)
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(6) * time.Second) // Give time for sync
 
-	srcIDs =  testClientSrc.GetAllIDs()
-	dstIDs =  testClientDst.GetAllIDs()
+	go testClientSrc.GetAllIDs(aChan)
+	go testClientDst.GetAllIDs(bChan)
 
-	log.Printf("Source IDs contents: %v", srcIDs)
-	log.Printf("Destination IDs contents: %v", dstIDs)
+	srcIDs = <- aChan
+	dstIDs = <- bChan
+	printIDTestResult(srcIDs, dstIDs)
 
 
 	testClientSrc.PerformSoftDelete(testingSubject2,4)
 	testClientSrc.PerformHardDelete(testingSubject2,4)
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(6) * time.Second) // Give time for sync
 
 	// Assert schemas in dest deep equal schemas in src
 
-	srcIDs =  testClientSrc.GetAllIDs()
-	dstIDs =  testClientDst.GetAllIDs()
+	go testClientSrc.GetAllIDs(aChan)
+	go testClientDst.GetAllIDs(bChan)
 
-	log.Println(srcIDs)
-	log.Println(dstIDs)
+	srcIDs = <- aChan
+	dstIDs = <- bChan
+	printIDTestResult(srcIDs, dstIDs)
 
 	assert.True(t, reflect.DeepEqual(srcIDs, dstIDs))
 
@@ -317,4 +320,14 @@ func TestSyncMode(t *testing.T) {
 	testClientDst.DeleteAllSubjectsPermanently()
 	time.Sleep(time.Duration(1) * time.Second) // Allow time for deletes to complete
 
+}
+
+func printSubjectTestResult (srcSubjects map[string][]int64, destSubjects map[string][]int64) {
+	log.Printf("Source subject-version mapping contents: %v",srcSubjects)
+	log.Printf("Source subject-version mapping contents: %v",destSubjects)
+}
+
+func printIDTestResult (srcIDs  map[int64]map[string]int64, dstIDs  map[int64]map[string]int64) {
+	log.Printf("Source IDs contents: %v", srcIDs)
+	log.Printf("Destination IDs contents: %v", dstIDs)
 }

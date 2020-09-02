@@ -273,7 +273,7 @@ func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int64
 	return handleDeletes(res.Body, res.StatusCode, req.Method, endpoint, "Hard", subject, version)
 }
 
-func (src *SchemaRegistryClient) GetAllIDs () map[int64]map[string]int64 {
+func (src *SchemaRegistryClient) GetAllIDs (aChan chan <- map[int64]map[string]int64) {
 	src.InMemIDs = map[int64]map[string]int64{} // Map of ID -> (Map of subject -> Version)
 
 	var aGroup sync.WaitGroup
@@ -291,7 +291,7 @@ func (src *SchemaRegistryClient) GetAllIDs () map[int64]map[string]int64 {
 	}
 	aGroup.Wait()
 
-	return src.InMemIDs
+	aChan <- src.InMemIDs
 
 }
 

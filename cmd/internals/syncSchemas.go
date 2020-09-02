@@ -124,8 +124,16 @@ func GetVersionsDiff (a1 []int64, a2 []int64) []int64 {
 
 func getPermanentlyDeletedSchemas (src *SchemaRegistryClient, dest *SchemaRegistryClient) map[int64]map[string]int64 {
 
-	srcIDs := src.GetAllIDs()
-	destIDs := dest.GetAllIDs()
+	aChan := make(chan map[int64]map[string]int64)
+	bChan := make(chan map[int64]map[string]int64)
+	srcIDs := make(map[int64]map[string]int64)
+	destIDs := make(map[int64]map[string]int64)
+
+	go src.GetAllIDs(aChan)
+	go dest.GetAllIDs(bChan)
+
+	srcIDs = <- aChan
+	destIDs = <- bChan
 
 	return getIDDiff(srcIDs,destIDs)
 
