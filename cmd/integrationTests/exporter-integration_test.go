@@ -35,6 +35,7 @@ func setup () {
 	client.SyncHardDeletes = true
 	client.LowerBound = 100000
 	client.UpperBound = 101000
+	client.HttpCallTimeout = 60
 
 	testClientSrc = client.NewSchemaRegistryClient("http://localhost:8081","testUser", "testPass", "src")
 	testClientDst = client.NewSchemaRegistryClient("http://localhost:8082","testUser", "testPass", "dst")

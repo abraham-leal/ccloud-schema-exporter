@@ -40,7 +40,7 @@ func NewSchemaRegistryClient(SR string, apiKey string, apiSecret string, target 
 	}
 
 	httpClient = http.Client{
-		Timeout: time.Second * time.Duration(httpCallTimeout),
+		Timeout: time.Second * time.Duration(HttpCallTimeout),
 	}
 
 	return &client

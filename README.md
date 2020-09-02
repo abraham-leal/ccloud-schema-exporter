@@ -129,4 +129,8 @@ This means we have to assume Schema Registry IDs in the source and destiny SRs a
 By default, this range is 100,000 to 101,000. (The default start and limit in Confluent Cloud)
 This range is tunable by setting `-lowerBound` and `-upperBound` together with enabling hard deletion sync with `-syncHardDeletes`.
 
+Keep in mind syncing hard deletes does have a performance penalty on the sync. 
+Getting the latest snapshot of the state is an expensive operation.
+You can expect about a 5-second increase in sync time.
+
 

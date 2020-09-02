@@ -9,7 +9,7 @@ import (
 	"net/http"
 )
 
-var httpCallTimeout int
+var HttpCallTimeout int
 var ScrapeInterval int
 var Version = "0.4-SNAPSHOT"
 var httpClient http.Client
