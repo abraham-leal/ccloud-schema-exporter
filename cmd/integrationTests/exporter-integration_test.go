@@ -176,7 +176,7 @@ func TestSyncMode(t *testing.T) {
 
 	// Start sync in another goroutine
 	go client.Sync(testClientSrc,testClientDst)
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 
 	// Assert schemas in dest deep equal schemas in src
 	srcSubjects := make (map[string][]int64)
@@ -212,7 +212,7 @@ func TestSyncMode(t *testing.T) {
 	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(newRegister.Schema,
 		newRegister.Subject,newRegister.Id,newRegister.Version,newRegister.SType)
 
-	time.Sleep(time.Duration(6) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 
 	// Assert schemas in dest deep equal schemas in src
 
@@ -229,7 +229,7 @@ func TestSyncMode(t *testing.T) {
 
 	// inject a soft delete
 	testClientSrc.PerformSoftDelete(testingSubject1,1)
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 
 	// Assert schemas in dest deep equal schemas in src
 
@@ -246,7 +246,7 @@ func TestSyncMode(t *testing.T) {
 
 	// inject a hard delete
 	testClientSrc.PerformHardDelete(testingSubject1,1)
-	time.Sleep(time.Duration(6) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 
 	// Assert schemas in dest deep equal schemas in src
 
@@ -276,7 +276,7 @@ func TestSyncMode(t *testing.T) {
 
 	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(newRegister.Schema,
 		newRegister.Subject,newRegister.Id,newRegister.Version,newRegister.SType)
-	time.Sleep(time.Duration(3) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(6) * time.Second) // Give time for sync
 
 	go testClientSrc.GetAllIDs(aChan)
 	go testClientDst.GetAllIDs(bChan)
@@ -288,7 +288,7 @@ func TestSyncMode(t *testing.T) {
 	// inject a hard delete
 	testClientSrc.PerformSoftDelete(testingSubject1,4)
 	testClientSrc.PerformHardDelete(testingSubject1,4)
-	time.Sleep(time.Duration(6) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(8) * time.Second) // Give time for sync
 
 	go testClientSrc.GetAllIDs(aChan)
 	go testClientDst.GetAllIDs(bChan)
@@ -300,7 +300,7 @@ func TestSyncMode(t *testing.T) {
 
 	testClientSrc.PerformSoftDelete(testingSubject2,4)
 	testClientSrc.PerformHardDelete(testingSubject2,4)
-	time.Sleep(time.Duration(6) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(8) * time.Second) // Give time for sync
 
 	// Assert schemas in dest deep equal schemas in src
 
@@ -315,11 +315,11 @@ func TestSyncMode(t *testing.T) {
 
 	log.Println("Killing sync goroutine")
 	client.TestHarnessRun = true
-	time.Sleep(time.Duration(1) * time.Second) // Give thread time to die
+	time.Sleep(time.Duration(3) * time.Second) // Give thread time to die
 
 	log.Println("Clean up destination SR")
 	testClientDst.DeleteAllSubjectsPermanently()
-	time.Sleep(time.Duration(1) * time.Second) // Allow time for deletes to complete
+	time.Sleep(time.Duration(3) * time.Second) // Allow time for deletes to complete
 
 }
 
