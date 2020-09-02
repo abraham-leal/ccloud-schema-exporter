@@ -276,7 +276,7 @@ func TestSyncMode(t *testing.T) {
 
 	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(newRegister.Schema,
 		newRegister.Subject,newRegister.Id,newRegister.Version,newRegister.SType)
-	time.Sleep(time.Duration(6) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(11) * time.Second) // Give time for sync
 
 	go testClientSrc.GetAllIDs(aChan)
 	go testClientDst.GetAllIDs(bChan)
@@ -288,7 +288,7 @@ func TestSyncMode(t *testing.T) {
 	// inject a hard delete
 	testClientSrc.PerformSoftDelete(testingSubject1,4)
 	testClientSrc.PerformHardDelete(testingSubject1,4)
-	time.Sleep(time.Duration(8) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(11) * time.Second) // Give time for sync
 
 	go testClientSrc.GetAllIDs(aChan)
 	go testClientDst.GetAllIDs(bChan)
@@ -300,7 +300,7 @@ func TestSyncMode(t *testing.T) {
 
 	testClientSrc.PerformSoftDelete(testingSubject2,4)
 	testClientSrc.PerformHardDelete(testingSubject2,4)
-	time.Sleep(time.Duration(8) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(11) * time.Second) // Give time for sync
 
 	// Assert schemas in dest deep equal schemas in src
 
