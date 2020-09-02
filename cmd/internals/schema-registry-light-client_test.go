@@ -25,7 +25,7 @@ func TestGetSubjectWithVersion(t *testing.T) {
 
 	testSClient := NewSchemaRegistryClient(server.URL(), "mockKey", "mockSecret","src")
 
-	aChan := make(chan map[string][]int)
+	aChan := make(chan map[string][]int64)
 	go testSClient.GetSubjectsWithVersions(aChan)
 	result := <- aChan
 

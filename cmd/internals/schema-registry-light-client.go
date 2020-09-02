@@ -29,14 +29,14 @@ func NewSchemaRegistryClient(SR string, apiKey string, apiSecret string, target 
 	// If the parameters are empty, go fetch from env
 	if (SR == "" || apiKey == "" || apiSecret == "") {
 		if (target == "dst") {
-			client = SchemaRegistryClient{SRUrl: DestGetSRUrl(),SRApiKey: DestGetAPIKey(), SRApiSecret: DestGetAPISecret(), InMemSchemas: map[string][]int{}}
+			client = SchemaRegistryClient{SRUrl: DestGetSRUrl(),SRApiKey: DestGetAPIKey(), SRApiSecret: DestGetAPISecret(), InMemSchemas: map[string][]int64{}, InMemIDs: map[int64]map[string]int64{}}
 		}
 		if (target == "src"){
-			client = SchemaRegistryClient{SRUrl: SrcGetSRUrl(),SRApiKey: SrcGetAPIKey(), SRApiSecret: SrcGetAPISecret(), InMemSchemas: map[string][]int{}}
+			client = SchemaRegistryClient{SRUrl: SrcGetSRUrl(),SRApiKey: SrcGetAPIKey(), SRApiSecret: SrcGetAPISecret(), InMemSchemas: map[string][]int64{}, InMemIDs: map[int64]map[string]int64{}}
 		}
 	} else {
 		// Enables passing in the vars through flags
-		client = SchemaRegistryClient{SRUrl: SR,SRApiKey: apiKey, SRApiSecret: apiSecret, InMemSchemas: map[string][]int{}}
+		client = SchemaRegistryClient{SRUrl: SR,SRApiKey: apiKey, SRApiSecret: apiSecret, InMemSchemas: map[string][]int64{}, InMemIDs: map[int64]map[string]int64{}}
 	}
 
 	httpClient = http.Client{
@@ -59,8 +59,8 @@ func (src *SchemaRegistryClient) IsReachable() bool {
 
 }
 
-func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[string][]int) {
-	src.InMemSchemas = make(map[string][]int)
+func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[string][]int64) {
+	src.InMemSchemas = make(map[string][]int64)
 	endpoint := fmt.Sprintf("%s/subjects",src.SRUrl)
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
 
@@ -112,7 +112,7 @@ func (src *SchemaRegistryClient) GetVersions (subject string, chanX chan <- Subj
 	}
 	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
-	response :=  []int{}
+	response :=  []int64{}
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -214,7 +214,7 @@ func (src *SchemaRegistryClient) GetSchema (subject string, version int64) Schem
 	return SchemaRecord{Subject: schemaResponse.Subject,Schema: schemaResponse.Schema, Version: schemaResponse.Version, Id: schemaResponse.Id, SType: schemaResponse.SType}.setTypeIfEmpty()
 }
 
-func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion (schema string, subject string, id int, version int, SType string) io.ReadCloser {
+func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion (schema string, subject string, id int64, version int64, SType string) io.ReadCloser {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions",src.SRUrl,subject)
 
 	schemaRequest := SchemaToRegister{Schema: schema, Id: id, Version: version, SType: SType}
@@ -231,14 +231,13 @@ func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion (schema 
 	}
 	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
-
 	return res.Body
 }
 
 // Deletes all schemas in the registry
 func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently (){
-	destSubjects := make (map[string][]int)
-	destChan := make(chan map[string][]int)
+	destSubjects := make (map[string][]int64)
+	destChan := make(chan map[string][]int64)
 	go src.GetSubjectsWithVersions(destChan)
 	destSubjects = <- destChan
 
@@ -252,7 +251,7 @@ func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently (){
 	}
 }
 
-func (src *SchemaRegistryClient) PerformSoftDelete(subject string, version int) bool {
+func (src *SchemaRegistryClient) PerformSoftDelete(subject string, version int64) bool {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d",src.SRUrl,subject,version)
 	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret,nil)
 	res, err := httpClient.Do(req)
@@ -263,7 +262,7 @@ func (src *SchemaRegistryClient) PerformSoftDelete(subject string, version int) 
 	return handleDeletes(res.Body, res.StatusCode, req.Method, endpoint, "Soft", subject, version)
 }
 
-func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int) bool {
+func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int64) bool {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d?permanent=true",src.SRUrl,subject,version)
 	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret,nil)
 	res, err := httpClient.Do(req)
@@ -274,8 +273,60 @@ func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int) 
 	return handleDeletes(res.Body, res.StatusCode, req.Method, endpoint, "Hard", subject, version)
 }
 
+func (src *SchemaRegistryClient) GetAllIDs () map[int64]map[string]int64 {
+	src.InMemIDs = map[int64]map[string]int64{} // Map of ID -> (Map of subject -> Version)
+
+	var aGroup sync.WaitGroup
+	//Generate bounds
+	for i := LowerBound; i <= UpperBound; i++ {
+		aGroup.Add(1)
+		/*
+			Rate limit: In order not to saturate the SR instances, we limit the rate at which we send discovery requests.
+			The idea being that if one SR instance can handle the load, a cluster should be able to handle it
+			even more easily. During testing, it was found that 1ms is an ideal delay for best sync performance.
+		*/
+		time.Sleep(time.Duration(1) * time.Millisecond)
+
+		go src.isID(int64(i), &aGroup)
+	}
+	aGroup.Wait()
+
+	return src.InMemIDs
+
+}
+
+func (src *SchemaRegistryClient) isID ( id int64, wg *sync.WaitGroup) {
+
+	httpClient := http.Client{
+		Timeout: time.Second * time.Duration(10),
+	}
+
+	endpoint := fmt.Sprintf("%s/schemas/ids/%d/versions", src.SRUrl, id)
+	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
+	res, err := httpClient.Do(req)
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+
+	var manyPairs []SubjectVersion
+	var tempMapOfSubjectVersion = map[string]int64{}
+	body, err := ioutil.ReadAll(res.Body)
+
+	if res.StatusCode == 200 {
+		mutex.Lock()
+		json.Unmarshal(body, &manyPairs)
+		for _ , subjectVer := range manyPairs {
+			tempMapOfSubjectVersion[subjectVer.Subject] = subjectVer.Version
+		}
+		src.InMemIDs[id] = tempMapOfSubjectVersion
+		mutex.Unlock()
+	}
+
+	defer wg.Done()
+}
+
 func handleDeletes (body io.Reader, statusCode int, method string, endpoint string,
-	reqType string, subject string, version int) bool {
+	reqType string, subject string, version int64) bool {
 	if statusCode != 200 {
 		body, _ := ioutil.ReadAll(body)
 		errorMsg := fmt.Sprintf(statusError, statusCode, method, endpoint)

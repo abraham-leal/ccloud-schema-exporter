@@ -9,7 +9,7 @@ This app supports three modes: `batchExport`, `sync`, and `getLocalCopy`.
 - `sync` will continuously sync newly registered schemas into the destination registry.
 - `getLocalCopy` will fetch and write local copies of Schema Registry's Schemas.
 
-If you are looking to migrate schemas between On-Prem and Confluent Cloud, check out 
+If you are looking to migrate schemas between On-Premise and Confluent Cloud, check out 
 [Confluent Replicator](https://docs.confluent.io/current/connect/kafka-connect-replicator/index.html).
 
 The exporter expects the following variables to be set in the environment to make the necessary calls:
@@ -40,12 +40,14 @@ docker run \
   -e DST_API_KEY=$DST_API_KEY \
   -e DST_API_SECRET=$DST_API_SECRET \
   abrahamleal/ccloud-schema-exporter:latest
+
 ````
 
 A sample docker-compose is also provided at the root of this directory.
 
-The docker image handles `-sync` continuous sync. For a one time export, it is recommended
-to use a release binary.
+The docker image handles `-sync -syncDeletes -syncHardDeletes` continuous sync. For a one time export, it is recommended to use a release binary.
+
+If you'd like to pass custom flags, it is recommended to override the entry-point such as with `--entrypoint` with `/ccloud-schema-exporter` at the beginning of the override.
 
 For Docker, the `latest` tag will build directly from master. The master branch of this project is kept non-breaking;
 However, for stable images tag a release.
@@ -59,6 +61,8 @@ into local files with naming structure subjectName-version-id per schema. The de
 {currentPath}/SchemaRegistryBackup/.
 
 When multiple flags are applied, prevalence is `sync` -> `batchExport` -> `getLocalCopy`
+
+NOTE: Given that the exporter cannot determine a per-subject compatibility rule, it is recommended to set the destination schema registry compatibility level to `NONE` on first sync and restore it to the source's level afterwards.
 
 ### Options
 
@@ -76,9 +80,11 @@ Usage of ./ccloud-schema-exporter:
   -dest-sr-url string
     	Url to the Destination Schema Registry Cluster
   -getLocalCopy
-    	Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path.
+    	Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path
   -getLocalCopyPath string
-    	Optional custom path for local copy. This must be an existing directory.
+    	Optional custom path for local copy. This must be an existing directory structure.
+  -lowerBound int
+    	Lower SR ID space bound (default 100000)
   -scrapeInterval int
     	Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds (default 60)
   -src-sr-key string
@@ -91,8 +97,12 @@ Usage of ./ccloud-schema-exporter:
     	Sync schemas continuously
   -syncDeletes
     	Setting this will sync soft deletes from the source cluster to the destination
+  -syncHardDeletes
+    	Setting this will sync hard deletes from the source cluster to the destination
   -timeout int
     	Timeout, in seconds, to use for all REST calls with the Schema Registries (default 60)
+  -upperBound int
+    	Upper SR ID space bound (default 101000)
   -usage
     	Print the usage of this tool
   -version
@@ -110,5 +120,13 @@ export DST_API_KEY=XXXX
 export DST_API_SECRET=XXXX
 ./ccloud-schema-exporter <-sync | -batchExport | -getLocalCopy>
 ````
+
+#### A Note on syncing hard deletions
+
+Confluent's Schema Registry does not provide a good way to discover the full space of IDs registered.
+Due to this, we do inefficient discovery of schema IDs. 
+This means we have to assume Schema Registry IDs in the source and destiny SRs are within a range. 
+By default, this range is 100,000 to 101,000. (The default start and limit in Confluent Cloud)
+This range is tunable by setting `-lowerBound` and `-upperBound` together with enabling hard deletion sync with `-syncHardDeletes`.
 
 

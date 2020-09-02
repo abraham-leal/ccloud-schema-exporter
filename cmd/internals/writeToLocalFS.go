@@ -32,7 +32,7 @@ func WriteToFS (srcClient *SchemaRegistryClient, definedPath string) {
 		}
 	}
 
-	srcChan := make(chan map[string][]int)
+	srcChan := make(chan map[string][]int64)
 	go srcClient.GetSubjectsWithVersions(srcChan)
 	srcSubjects := <- srcChan
 	var aGroup sync.WaitGroup
@@ -47,7 +47,7 @@ func WriteToFS (srcClient *SchemaRegistryClient, definedPath string) {
 	aGroup.Wait()
 }
 
-func writeSchema (srcClient *SchemaRegistryClient, pathToWrite string, subject string, version int, wg *sync.WaitGroup) {
+func writeSchema (srcClient *SchemaRegistryClient, pathToWrite string, subject string, version int64, wg *sync.WaitGroup) {
 	rawSchema := srcClient.GetSchema(subject,int64(version))
 
 

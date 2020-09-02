@@ -22,5 +22,8 @@ var DestSRKey string
 var DestSRSecret string
 var RunMode string
 var SyncDeletes bool
+var SyncHardDeletes bool
 var PathToWrite string
 var TestHarnessRun bool
+var LowerBound int64
+var UpperBound int64

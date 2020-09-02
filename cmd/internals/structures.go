@@ -9,7 +9,8 @@ type SchemaRegistryClient struct {
 	SRUrl        string
 	SRApiKey     string
 	SRApiSecret  string
-	InMemSchemas map[string][]int
+	InMemSchemas map[string][]int64
+	InMemIDs	 map[int64]map[string]int64
 }
 
 type SchemaRecord struct {
@@ -31,15 +32,15 @@ func (srs SchemaRecord) setTypeIfEmpty () SchemaRecord {
 
 type SchemaToRegister struct {
 	Schema string 	`json:"schema"`
-	Id int 			`json:"id"`
-	Version int 	`json:"version"`
+	Id int64 			`json:"id"`
+	Version int64 	`json:"version"`
 	SType string 	`json:"schemaType"`
 }
 
 type SchemaExtraction struct {
 	Schema string 	`json:"schema"`
 	Id int 			`json:"id"`
-	Version int 	`json:"version"`
+	Version int64 	`json:"version"`
 	Subject string 	`json:"subject"`
 }
 
@@ -49,5 +50,10 @@ type ModeRecord struct {
 
 type SubjectWithVersions struct {
 	Subject string
-	Versions []int
+	Versions []int64
+}
+
+type SubjectVersion struct {
+	Subject string `json:"subject"`
+	Version int64 `json:"version"`
 }
