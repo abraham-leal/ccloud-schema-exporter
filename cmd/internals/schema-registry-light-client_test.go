@@ -30,7 +30,7 @@ func TestGetSubjectWithVersion(t *testing.T) {
 	result := <- aChan
 
 	assert.NotNil(t, result["testSubject"])
-	assert.Equal(t, []int{1}, result["testSubject"])
+	assert.Equal(t, []int64{1}, result["testSubject"])
 
 	registryHandler.AssertExpectations(t)
 }
