@@ -297,7 +297,6 @@ func TestSyncMode(t *testing.T) {
 	dstIDs = <- bChan
 	printIDTestResult(srcIDs, dstIDs)
 
-
 	testClientSrc.PerformSoftDelete(testingSubject2,4)
 	testClientSrc.PerformHardDelete(testingSubject2,4)
 	time.Sleep(time.Duration(11) * time.Second) // Give time for sync
@@ -306,6 +305,7 @@ func TestSyncMode(t *testing.T) {
 
 	go testClientSrc.GetAllIDs(aChan)
 	go testClientDst.GetAllIDs(bChan)
+	time.Sleep(time.Duration(6) * time.Second) // Give time for sync
 
 	srcIDs = <- aChan
 	dstIDs = <- bChan
