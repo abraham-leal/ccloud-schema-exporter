@@ -6,7 +6,7 @@ import (
 
 func BatchExport (srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
 
-	srcChan := make(chan map[string][]int)
+	srcChan := make(chan map[string][]int64)
 	go srcClient.GetSubjectsWithVersions(srcChan)
 	srcSubjects := <- srcChan
 
@@ -18,8 +18,8 @@ func BatchExport (srcClient *SchemaRegistryClient, destClient *SchemaRegistryCli
 			schema.Subject, schema.Version, schema.Id, schema.SType)
 			destClient.RegisterSchemaBySubjectAndIDAndVersion(schema.Schema,
 				schema.Subject,
-				int(schema.Id),
-				int(schema.Version),
+				schema.Id,
+				schema.Version,
 				schema.SType)
 		}
 	}

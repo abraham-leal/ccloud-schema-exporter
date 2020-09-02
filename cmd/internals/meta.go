@@ -9,7 +9,7 @@ import (
 	"net/http"
 )
 
-var httpCallTimeout int
+var HttpCallTimeout int
 var ScrapeInterval int
 var Version = "0.4-SNAPSHOT"
 var httpClient http.Client
@@ -22,5 +22,8 @@ var DestSRKey string
 var DestSRSecret string
 var RunMode string
 var SyncDeletes bool
+var SyncHardDeletes bool
 var PathToWrite string
 var TestHarnessRun bool
+var LowerBound int64
+var UpperBound int64

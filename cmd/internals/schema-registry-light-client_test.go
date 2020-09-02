@@ -25,12 +25,12 @@ func TestGetSubjectWithVersion(t *testing.T) {
 
 	testSClient := NewSchemaRegistryClient(server.URL(), "mockKey", "mockSecret","src")
 
-	aChan := make(chan map[string][]int)
+	aChan := make(chan map[string][]int64)
 	go testSClient.GetSubjectsWithVersions(aChan)
 	result := <- aChan
 
 	assert.NotNil(t, result["testSubject"])
-	assert.Equal(t, []int{1}, result["testSubject"])
+	assert.Equal(t, []int64{1}, result["testSubject"])
 
 	registryHandler.AssertExpectations(t)
 }

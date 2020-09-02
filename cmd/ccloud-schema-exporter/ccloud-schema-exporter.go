@@ -37,7 +37,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	destChan := make(chan map[string][]int)
+	destChan := make(chan map[string][]int64)
 	go destClient.GetSubjectsWithVersions(destChan)
 	destSubjects := <- destChan
 	close(destChan)
