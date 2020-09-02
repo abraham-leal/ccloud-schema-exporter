@@ -16,7 +16,8 @@ import (
 var composeEnv *testcontainers.LocalDockerCompose
 var testClientSrc *client.SchemaRegistryClient
 var testClientDst *client.SchemaRegistryClient
-var testingSubject = "someSubject-value"
+var testingSubject1 = "someSubject-value"
+var testingSubject2 = "someSubject-key"
 
 func TestMain(m *testing.M) {
 	setup()
@@ -32,13 +33,15 @@ func setup () {
 	client.ScrapeInterval = 2
 	client.SyncDeletes = true
 	client.SyncHardDeletes = true
+	client.LowerBound = 100000
+	client.UpperBound = 101000
 
 	testClientSrc = client.NewSchemaRegistryClient("http://localhost:8081","testUser", "testPass", "src")
 	testClientDst = client.NewSchemaRegistryClient("http://localhost:8082","testUser", "testPass", "dst")
 
 	if testClientSrc.IsReachable() && testClientDst.IsReachable() {
 		// Set up our source registry
-		subjects := []string{testingSubject,"someSubject-key"}
+		subjects := []string{testingSubject1,testingSubject2}
 		id := int64(100001)
 		versions := []int64{1, 2, 3}
 
@@ -189,8 +192,8 @@ func TestSyncMode(t *testing.T) {
 
 	log.Println("Testing initial sync")
 
-	log.Println(srcSubjects)
-	log.Println(destSubjects)
+	log.Printf("Source subject-version mapping contents: %v",srcSubjects)
+	log.Printf("Source subject-version mapping contents: %v",destSubjects)
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
 
@@ -198,7 +201,7 @@ func TestSyncMode(t *testing.T) {
 	schema := "{\"type\":\"record\",\"name\":\"value_newnew\",\"namespace\":\"com.mycorp.mynamespace\",\"doc\":\"Sample schema to help you get started.\",\"fields\":[{\"name\":\"this\",\"type\":\"int\",\"doc\":\"The int type is a 32-bit signed integer.\"},{\"default\": null,\"name\": \"onefield\",\"type\": [\"null\",\"string\"]}]}"
 
 	newRegister := client.SchemaRecord{
-		Subject: testingSubject,
+		Subject: testingSubject1,
 		Schema:  schema,
 		SType:   "AVRO",
 		Version: 4,
@@ -210,7 +213,7 @@ func TestSyncMode(t *testing.T) {
 	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(newRegister.Schema,
 		newRegister.Subject,newRegister.Id,newRegister.Version,newRegister.SType)
 
-	time.Sleep(time.Duration(15) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(6) * time.Second) // Give time for sync
 
 	// Assert schemas in dest deep equal schemas in src
 
@@ -220,16 +223,16 @@ func TestSyncMode(t *testing.T) {
 	srcSubjects = <- srcChan
 	destSubjects = <- destChan
 
-	log.Println(srcSubjects)
-	log.Println(destSubjects)
+	log.Printf("Source subject-version mapping contents: %v",srcSubjects)
+	log.Printf("Source subject-version mapping contents: %v",destSubjects)
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
 
 	log.Println("Testing soft delete sync")
 
 	// inject a soft delete
-	testClientSrc.PerformSoftDelete(testingSubject,1)
-	time.Sleep(time.Duration(15) * time.Second) // Give time for sync
+	testClientSrc.PerformSoftDelete(testingSubject1,1)
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	// Assert schemas in dest deep equal schemas in src
 
@@ -239,24 +242,70 @@ func TestSyncMode(t *testing.T) {
 	srcSubjects = <- srcChan
 	destSubjects = <- destChan
 
-	log.Println(srcSubjects)
-	log.Println(destSubjects)
+	log.Printf("Source subject-version mapping contents: %v",srcSubjects)
+	log.Printf("Source subject-version mapping contents: %v",destSubjects)
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
 
-	log.Println("Testing hard delete sync")
+	log.Println("Testing hard delete sync for subject")
 
 	// inject a hard delete
-	testClientSrc.PerformHardDelete(testingSubject,1)
-	time.Sleep(time.Duration(15) * time.Second) // Give time for sync
+	testClientSrc.PerformHardDelete(testingSubject1,1)
+	time.Sleep(time.Duration(6) * time.Second) // Give time for sync
 
 	// Assert schemas in dest deep equal schemas in src
 
 	srcIDs :=  testClientSrc.GetAllIDs()
 	dstIDs :=  testClientDst.GetAllIDs()
 
-	log.Println(srcSubjects)
-	log.Println(destSubjects)
+	log.Printf("Source IDs contents: %v", srcIDs)
+	log.Printf("Destination IDs contents: %v", dstIDs)
+
+	assert.True(t, reflect.DeepEqual(srcIDs, dstIDs))
+
+	log.Println("Testing hard delete sync for whole ID")
+
+	newRegister = client.SchemaRecord{
+		Subject: testingSubject2,
+		Schema:  schema,
+		SType:   "AVRO",
+		Version: 4,
+		Id:      100007,
+	}
+
+	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(newRegister.Schema,
+		newRegister.Subject,newRegister.Id,newRegister.Version,newRegister.SType)
+	time.Sleep(time.Duration(3) * time.Second) // Give time for sync
+
+	srcIDs =  testClientSrc.GetAllIDs()
+	dstIDs =  testClientDst.GetAllIDs()
+
+	log.Printf("Source IDs contents: %v", srcIDs)
+	log.Printf("Destination IDs contents: %v", dstIDs)
+
+	// inject a hard delete
+	testClientSrc.PerformSoftDelete(testingSubject1,4)
+	testClientSrc.PerformHardDelete(testingSubject1,4)
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+
+	srcIDs =  testClientSrc.GetAllIDs()
+	dstIDs =  testClientDst.GetAllIDs()
+
+	log.Printf("Source IDs contents: %v", srcIDs)
+	log.Printf("Destination IDs contents: %v", dstIDs)
+
+
+	testClientSrc.PerformSoftDelete(testingSubject2,4)
+	testClientSrc.PerformHardDelete(testingSubject2,4)
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+
+	// Assert schemas in dest deep equal schemas in src
+
+	srcIDs =  testClientSrc.GetAllIDs()
+	dstIDs =  testClientDst.GetAllIDs()
+
+	log.Println(srcIDs)
+	log.Println(dstIDs)
 
 	assert.True(t, reflect.DeepEqual(srcIDs, dstIDs))
 

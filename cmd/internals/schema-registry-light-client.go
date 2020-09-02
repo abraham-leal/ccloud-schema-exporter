@@ -287,7 +287,7 @@ func (src *SchemaRegistryClient) GetAllIDs () map[int64]map[string]int64 {
 		*/
 		time.Sleep(time.Duration(1) * time.Millisecond)
 
-		go src.isID(int64(i), &aGroup)
+		go src.isID(i, &aGroup)
 	}
 	aGroup.Wait()
 
@@ -305,7 +305,7 @@ func (src *SchemaRegistryClient) isID ( id int64, wg *sync.WaitGroup) {
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
 	res, err := httpClient.Do(req)
 	if err != nil {
-		log.Fatalln(err.Error())
+		log.Println(err.Error())
 	}
 
 	var manyPairs []SubjectVersion
@@ -333,9 +333,9 @@ func handleDeletes (body io.Reader, statusCode int, method string, endpoint stri
 		log.Printf("ERROR: %s, HTTP Response: %s",errorMsg, string(body))
 	} else {
 		log.Println(fmt.Sprintf("%s deleted subject: %s, version: %d", reqType, subject, version))
-		return false
+		return true
 	}
-	return true
+	return false
 }
 
 func handleNotSuccess (body io.Reader, statusCode int, method string, endpoint string){
