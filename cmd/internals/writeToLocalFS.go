@@ -1,5 +1,10 @@
 package client
 
+//
+// writeToLocal.go
+// Author: Abraham Leal
+//
+
 import (
 	"fmt"
 	"log"

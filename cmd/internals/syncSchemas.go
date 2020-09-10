@@ -1,5 +1,10 @@
 package client
 
+//
+// syncSchemas.go
+// Author: Abraham Leal
+//
+
 import (
 	"log"
 	"reflect"
@@ -9,8 +14,6 @@ import (
 )
 
 var mutex = sync.Mutex{}
-var srcIDs = map[int][]SubjectVersion{}
-var dstIDs = map[int][]SubjectVersion{}
 
 func Sync (srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
 

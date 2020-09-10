@@ -1,16 +1,16 @@
 package client
 
+//
+// definitions.go
+// Author: Abraham Leal
+//
+
 import (
 	"fmt"
 	"io/ioutil"
 	"strings"
 	"unicode"
 )
-
-//
-// definitions.go
-// Author: Abraham Leal
-//
 
 type SchemaRegistryClient struct {
 	SRUrl        string
