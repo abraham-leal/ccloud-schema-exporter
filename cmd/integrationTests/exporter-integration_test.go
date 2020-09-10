@@ -449,8 +449,11 @@ func TestSyncMode(t *testing.T) {
 	client.TestHarnessRun = true
 	time.Sleep(time.Duration(3) * time.Second) // Give thread time to die
 
-	log.Println("Clean up destination SR")
+	log.Println("Clean up SRs")
 	testClientDst.DeleteAllSubjectsPermanently()
+	testClientSrc.DeleteAllSubjectsPermanently()
+	log.Println("Reset source destination SR")
+	setupSource()
 	time.Sleep(time.Duration(3) * time.Second) // Allow time for deletes to complete
 
 }
@@ -494,12 +497,13 @@ func TestSyncModeWallowLists(t *testing.T) {
 	printSubjectTestResult(srcSubjects, destSubjects)
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
+	assert.True(t, len(destSubjects) == 1)
 
 	// inject a new write
 	schema := "{\"type\":\"record\",\"name\":\"value_newnew\",\"namespace\":\"com.mycorp.mynamespace\",\"doc\":\"Sample schema to help you get started.\",\"fields\":[{\"name\":\"this\",\"type\":\"int\",\"doc\":\"The int type is a 32-bit signed integer.\"},{\"default\": null,\"name\": \"onefield\",\"type\": [\"null\",\"string\"]}]}"
 
 	newRegister := client.SchemaRecord{
-		Subject: testingSubject1,
+		Subject: testingSubject2,
 		Schema:  schema,
 		SType:   "AVRO",
 		Version: 4,
@@ -523,6 +527,7 @@ func TestSyncModeWallowLists(t *testing.T) {
 	printSubjectTestResult(srcSubjects, destSubjects)
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
+	assert.True(t, len(destSubjects) == 1)
 
 	log.Println("Testing soft delete sync")
 
@@ -538,6 +543,7 @@ func TestSyncModeWallowLists(t *testing.T) {
 	srcSubjects = <- srcChan
 	destSubjects = <- destChan
 	printSubjectTestResult(srcSubjects, destSubjects)
+	assert.True(t, len(destSubjects) == 1)
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
 
@@ -562,62 +568,17 @@ func TestSyncModeWallowLists(t *testing.T) {
 	printIDTestResult(srcIDs, dstIDs)
 
 	assert.True(t, reflect.DeepEqual(srcIDs, dstIDs))
-
-	log.Println("Testing hard delete sync for whole ID")
-
-	newRegister = client.SchemaRecord{
-		Subject: testingSubject2,
-		Schema:  schema,
-		SType:   "AVRO",
-		Version: 4,
-		Id:      100007,
-	}
-
-	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(newRegister.Schema,
-		newRegister.Subject,newRegister.Id,newRegister.Version,newRegister.SType)
-	time.Sleep(time.Duration(11) * time.Second) // Give time for sync
-
-	go testClientSrc.GetAllIDs(aChan)
-	go testClientDst.GetAllIDs(bChan)
-
-	srcIDs = <- aChan
-	dstIDs = <- bChan
-	printIDTestResult(srcIDs, dstIDs)
-
-	// inject a hard delete
-	testClientSrc.PerformSoftDelete(testingSubject1,4)
-	testClientSrc.PerformHardDelete(testingSubject1,4)
-	time.Sleep(time.Duration(11) * time.Second) // Give time for sync
-
-	go testClientSrc.GetAllIDs(aChan)
-	go testClientDst.GetAllIDs(bChan)
-
-	srcIDs = <- aChan
-	dstIDs = <- bChan
-	printIDTestResult(srcIDs, dstIDs)
-
-	testClientSrc.PerformSoftDelete(testingSubject2,4)
-	testClientSrc.PerformHardDelete(testingSubject2,4)
-	time.Sleep(time.Duration(11) * time.Second) // Give time for sync
-
-	// Assert schemas in dest deep equal schemas in src
-
-	go testClientSrc.GetAllIDs(aChan)
-	go testClientDst.GetAllIDs(bChan)
-	time.Sleep(time.Duration(6) * time.Second) // Give time for sync
-
-	srcIDs = <- aChan
-	dstIDs = <- bChan
-	printIDTestResult(srcIDs, dstIDs)
-
-	assert.True(t, reflect.DeepEqual(srcIDs, dstIDs))
+	assert.True(t, len(dstIDs) == 3)
 
 	log.Println("Killing sync goroutine")
 	client.TestHarnessRun = true
 	time.Sleep(time.Duration(3) * time.Second) // Give thread time to die
 
-	log.Println("Clean up destination SR")
+	log.Println("Clean up SRs")
 	testClientDst.DeleteAllSubjectsPermanently()
+	testClientSrc.DeleteAllSubjectsPermanently()
+	log.Println("Reset source destination SR")
+	setupSource()
 	time.Sleep(time.Duration(3) * time.Second) // Allow time for deletes to complete
 
 }
@@ -661,6 +622,7 @@ func TestSyncModeWdisallowLists(t *testing.T) {
 	printSubjectTestResult(srcSubjects, destSubjects)
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
+	assert.True(t, len(destSubjects) == 1)
 
 	// inject a new write
 	schema := "{\"type\":\"record\",\"name\":\"value_newnew\",\"namespace\":\"com.mycorp.mynamespace\",\"doc\":\"Sample schema to help you get started.\",\"fields\":[{\"name\":\"this\",\"type\":\"int\",\"doc\":\"The int type is a 32-bit signed integer.\"},{\"default\": null,\"name\": \"onefield\",\"type\": [\"null\",\"string\"]}]}"
@@ -690,6 +652,7 @@ func TestSyncModeWdisallowLists(t *testing.T) {
 	printSubjectTestResult(srcSubjects, destSubjects)
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
+	assert.True(t, len(destSubjects) == 1)
 
 	log.Println("Testing soft delete sync")
 
@@ -707,11 +670,12 @@ func TestSyncModeWdisallowLists(t *testing.T) {
 	printSubjectTestResult(srcSubjects, destSubjects)
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
+	assert.True(t, len(destSubjects) == 1)
 
 	log.Println("Testing hard delete sync for subject")
 
 	// inject a hard delete
-	testClientSrc.PerformHardDelete(testingSubject2,1)
+	testClientSrc.PerformHardDelete(testingSubject1,1)
 	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 
 	// Assert schemas in dest deep equal schemas in src
@@ -729,62 +693,17 @@ func TestSyncModeWdisallowLists(t *testing.T) {
 	printIDTestResult(srcIDs, dstIDs)
 
 	assert.True(t, reflect.DeepEqual(srcIDs, dstIDs))
-
-	log.Println("Testing hard delete sync for whole ID")
-
-	newRegister = client.SchemaRecord{
-		Subject: testingSubject1,
-		Schema:  schema,
-		SType:   "AVRO",
-		Version: 4,
-		Id:      100007,
-	}
-
-	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(newRegister.Schema,
-		newRegister.Subject,newRegister.Id,newRegister.Version,newRegister.SType)
-	time.Sleep(time.Duration(11) * time.Second) // Give time for sync
-
-	go testClientSrc.GetAllIDs(aChan)
-	go testClientDst.GetAllIDs(bChan)
-
-	srcIDs = <- aChan
-	dstIDs = <- bChan
-	printIDTestResult(srcIDs, dstIDs)
-
-	// inject a hard delete
-	testClientSrc.PerformSoftDelete(testingSubject1,4)
-	testClientSrc.PerformHardDelete(testingSubject1,4)
-	time.Sleep(time.Duration(11) * time.Second) // Give time for sync
-
-	go testClientSrc.GetAllIDs(aChan)
-	go testClientDst.GetAllIDs(bChan)
-
-	srcIDs = <- aChan
-	dstIDs = <- bChan
-	printIDTestResult(srcIDs, dstIDs)
-
-	testClientSrc.PerformSoftDelete(testingSubject1,4)
-	testClientSrc.PerformHardDelete(testingSubject1,4)
-	time.Sleep(time.Duration(11) * time.Second) // Give time for sync
-
-	// Assert schemas in dest deep equal schemas in src
-
-	go testClientSrc.GetAllIDs(aChan)
-	go testClientDst.GetAllIDs(bChan)
-	time.Sleep(time.Duration(6) * time.Second) // Give time for sync
-
-	srcIDs = <- aChan
-	dstIDs = <- bChan
-	printIDTestResult(srcIDs, dstIDs)
-
-	assert.True(t, reflect.DeepEqual(srcIDs, dstIDs))
+	assert.True(t, len(dstIDs) == 3)
 
 	log.Println("Killing sync goroutine")
 	client.TestHarnessRun = true
 	time.Sleep(time.Duration(3) * time.Second) // Give thread time to die
 
-	log.Println("Clean up destination SR")
+	log.Println("Clean up SRs")
 	testClientDst.DeleteAllSubjectsPermanently()
+	testClientSrc.DeleteAllSubjectsPermanently()
+	log.Println("Reset source destination SR")
+	setupSource()
 	time.Sleep(time.Duration(3) * time.Second) // Allow time for deletes to complete
 
 }
@@ -797,4 +716,56 @@ func printSubjectTestResult (srcSubjects map[string][]int64, destSubjects map[st
 func printIDTestResult (srcIDs  map[int64]map[string]int64, dstIDs  map[int64]map[string]int64) {
 	log.Printf("Source IDs contents: %v", srcIDs)
 	log.Printf("Destination IDs contents: %v", dstIDs)
+}
+
+func setupSource () {
+	// Set up our source registry
+	subjects := []string{testingSubject1,testingSubject2}
+	id := int64(100001)
+	versions := []int64{1, 2, 3}
+
+	err := testClientSrc.SetMode("IMPORT")
+	if err == false {
+		log.Println("Could not set source registry to IMPORT ModeRecord.")
+		os.Exit(0)
+	}
+
+	schema := "{\"type\": \"record\",\"namespace\": \"com.mycorp.mynamespace\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"},{\"name\": \"too\",\"type\": \"string\",\"doc\": \"The string is a unicode character sequence.\"}]}"
+
+	schema2 := "{\"type\": \"record\",\"namespace\": \"com.mycorp.mynamespace\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"}]}"
+
+	schema3 := 	"{\"type\": \"record\",\"namespace\": \"com.mycorp.mynamespace\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
+
+	schema4 := "{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"},{\"name\": \"too\",\"type\": \"string\",\"doc\": \"The string is a unicode character sequence.\"}]}"
+
+	schema5 := "{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"}]}"
+
+	schema6 := 	"{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
+
+	schemas := []string{schema, schema2, schema3, schema4, schema5, schema6}
+	counter := 1
+
+	for _, subject := range subjects {
+		for _ , version := range versions {
+
+			currentRecord := client.SchemaRecord{
+				Subject: subject,
+				Schema:  schemas[counter-1],
+				SType:   "AVRO",
+				Version: version,
+				Id:      id,
+			}
+
+			testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(
+				currentRecord.Schema,
+				currentRecord.Subject,
+				currentRecord.Id,
+				currentRecord.Version,
+				"AVRO")
+
+			log.Printf("Registering schema with subject %s, version %d, and id %d", currentRecord.Subject, currentRecord.Version, currentRecord.Id)
+			id = id + 1
+			counter++
+		}
+	}
 }
