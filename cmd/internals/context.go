@@ -26,6 +26,8 @@ func GetFlags() {
 		"Optional custom path for local copy. This must be an existing directory structure.")
 	flag.Int64Var(&LowerBound, "lowerBound", 100000, "Lower SR ID space bound")
 	flag.Int64Var(&UpperBound, "upperBound", 101000, "Upper SR ID space bound")
+	flag.Var(&AllowList, "allowList", "A comma delimited list of schema subjects to allow. It also accepts paths to a file containing a list of subjects.")
+	flag.Var(&DisallowList, "disallowList", "A comma delimited list of schema subjects to disallow. It also accepts paths to a file containing a list of subjects.")
 	versionFlag := flag.Bool("version", false, "Print the current version and exit")
 	usageFlag := flag.Bool("usage", false, "Print the usage of this tool")
 	batchExportFlag := flag.Bool("batchExport", false, "Perform a one-time export of all schemas")
@@ -34,6 +36,7 @@ func GetFlags() {
 	deleteFlag := flag.Bool("deleteAllFromDestination", false, "Setting this will run a delete on all schemas written to the destination registry")
 	syncDeletesFlag := flag.Bool("syncDeletes", false, "Setting this will sync soft deletes from the source cluster to the destination")
 	syncHardDeletesFlag := flag.Bool("syncHardDeletes", false, "Setting this will sync hard deletes from the source cluster to the destination")
+
 
 	flag.Parse()
 
@@ -91,6 +94,7 @@ func deleteAll(sr string, key string, secret string){
 	destClient := NewSchemaRegistryClient(sr,key,secret, "dst")
 	destClient.DeleteAllSubjectsPermanently()
 }
+
 
 
 

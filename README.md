@@ -69,6 +69,8 @@ NOTE: Given that the exporter cannot determine a per-subject compatibility rule,
 ````
 Usage of ./ccloud-schema-exporter:
 
+  -allowList value
+    	A comma delimited list of schema subjects to allow. It also accepts paths to a file containing a list of subjects.
   -batchExport
     	Perform a one-time export of all schemas
   -deleteAllFromDestination
@@ -79,6 +81,8 @@ Usage of ./ccloud-schema-exporter:
     	API SECRET for the Destination Schema Registry Cluster
   -dest-sr-url string
     	Url to the Destination Schema Registry Cluster
+  -disallowList value
+    	A comma delimited list of schema subjects to disallow. It also accepts paths to a file containing a list of subjects.
   -getLocalCopy
     	Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path
   -getLocalCopyPath string
@@ -120,6 +124,15 @@ export DST_API_KEY=XXXX
 export DST_API_SECRET=XXXX
 ./ccloud-schema-exporter <-sync | -batchExport | -getLocalCopy>
 ````
+
+#### Filtering the export
+
+It is now possible to filter the subjects which are sync-ed in all modes (`<-sync | -batchExport | -getLocalCopy>`).
+Setting `-allowList` or/and `-disallowList` flags will accept either a comma delimited string or a file containing
+comma delimited entries for subject names (keep in mind these subjects must have their postfixes such as `-value` or 
+`key` to match the topic schema.
+These lists will be respected with schema sync, soft delete sync, and hard delete sync options.
+A subject specified in `-disallowList` and `-allowList` will be disallowed by default.
 
 #### A Note on syncing hard deletions
 

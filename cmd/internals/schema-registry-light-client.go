@@ -82,8 +82,18 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[strin
 		log.Printf(err.Error())
 	}
 
+	// Convert back to slice for speed of iteration
+	filteredSubjects := []string{}
+	for key, _ := range filterListedSubjects(response) {
+		filteredSubjects = append(filteredSubjects, key)
+	}
+
+	response = filteredSubjects
+
+	// Start async fetching
+
 	var aGroup sync.WaitGroup
-	aChan := make(chan SubjectWithVersions, 1000)
+	aChan := make(chan SubjectWithVersions, 10000)
 
 	for _, s := range response {
 		aGroup.Add(1)
@@ -102,7 +112,7 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[strin
 	chanY <- src.InMemSchemas
 }
 
-func (src *SchemaRegistryClient) GetVersions (subject string, chanX chan <- SubjectWithVersions, wg *sync.WaitGroup) {
+func (src *SchemaRegistryClient) GetVersions(subject string, chanX chan <- SubjectWithVersions, wg *sync.WaitGroup) {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl,subject)
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
 
@@ -315,10 +325,14 @@ func (src *SchemaRegistryClient) isID ( id int64, wg *sync.WaitGroup) {
 	if res.StatusCode == 200 {
 		mutex.Lock()
 		json.Unmarshal(body, &manyPairs)
+		manyPairs = filterListedSubjectsVersions(manyPairs)
 		for _ , subjectVer := range manyPairs {
 			tempMapOfSubjectVersion[subjectVer.Subject] = subjectVer.Version
 		}
-		src.InMemIDs[id] = tempMapOfSubjectVersion
+		if len(tempMapOfSubjectVersion) != 0 { // Do not add IDs with empty subject-version references
+			src.InMemIDs[id] = tempMapOfSubjectVersion
+		}
+
 		mutex.Unlock()
 	}
 
@@ -344,4 +358,65 @@ func handleNotSuccess (body io.Reader, statusCode int, method string, endpoint s
 		errorMsg := fmt.Sprintf(statusError, statusCode, method, endpoint)
 		log.Printf("ERROR: %s, HTTP Response: %s",errorMsg, string(body))
 	}
+}
+
+func filterListedSubjects (response []string) map[string]bool {
+	// Start allow list work
+	subjectMap := map[string]bool{}
+
+	for _ ,s := range response { // Generate a map of subjects for easier manipulation
+		subjectMap[s] = true
+	}
+
+	for s, _ := range subjectMap { // Filter out for allow lists
+		if AllowList != nil { // If allow list is defined
+			_, allowContains := AllowList[s]
+			if !allowContains { // If allow list does not contain it, delete it
+				delete(subjectMap, s)
+			}
+		}
+		if DisallowList != nil { // If disallow list is defined
+			_, disallowContains := DisallowList[s]
+			if disallowContains { // If disallow list contains it, delete it
+				delete(subjectMap, s)
+			}
+		}
+	}
+
+	return subjectMap
+}
+
+
+func filterListedSubjectsVersions (response []SubjectVersion) []SubjectVersion {
+	subjectMap := map[string]int64{}
+
+	for _ ,s := range response { // Generate a map of subjects for easier manipulation
+		subjectMap[s.Subject] = s.Version
+	}
+
+	for s, _ := range subjectMap { // Filter out for allow lists
+		if AllowList != nil { // If allow list is defined
+			_, allowContains := AllowList[s]
+			if !allowContains { // If allow list does not contain it, delete it
+				delete(subjectMap, s)
+			}
+		}
+		if DisallowList != nil { // If disallow list is defined
+			_, disallowContains := DisallowList[s]
+			if disallowContains { // If disallow list contains it, delete it
+				delete(subjectMap, s)
+			}
+		}
+	}
+
+	subjectVersionSlice := []SubjectVersion{}
+	for s, v := range subjectMap {
+		tempSubjVer := SubjectVersion{
+			Subject: s,
+			Version: v,
+		}
+		subjectVersionSlice = append(subjectVersionSlice, tempSubjVer)
+	}
+
+	return subjectVersionSlice
 }
