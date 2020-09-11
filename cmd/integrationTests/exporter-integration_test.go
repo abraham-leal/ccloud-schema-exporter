@@ -71,38 +71,25 @@ func TestExportMode(t *testing.T) {
 	assert.True(t,reflect.DeepEqual(srcSubjects,dstSubjects))
 
 	cleanup()
-}
 
-func TestExportModeWallowLists(t *testing.T) {
 	log.Println("Test Export Mode with Allow Lists!")
-
-	setImportMode()
 	setupSource()
-
 	client.AllowList = map[string]bool{
 		testingSubjectKey: true,
 	}
 	client.DisallowList = nil
 
 	client.BatchExport(testClientSrc,testClientDst)
-
-	dstChan := make(chan map[string][]int64)
-
 	go testClientDst.GetSubjectsWithVersions(dstChan)
-
-	dstSubjects := <- dstChan
+	dstSubjects = <- dstChan
 
 	_ , contains := dstSubjects[testingSubjectKey]
 	assert.Equal(t, 1, len(dstSubjects))
 	assert.True(t, contains)
 
 	cleanup()
-}
 
-func TestExportModeWdisallowLists(t *testing.T) {
 	log.Println("Test Export Mode with Disallow Lists!")
-
-	setImportMode()
 	setupSource()
 
 	client.AllowList = nil
@@ -111,18 +98,15 @@ func TestExportModeWdisallowLists(t *testing.T) {
 	}
 
 	client.BatchExport(testClientSrc,testClientDst)
-
-	dstChan := make(chan map[string][]int64)
-
 	go testClientDst.GetSubjectsWithVersions(dstChan)
+	dstSubjects = <- dstChan
 
-	dstSubjects := <- dstChan
-
-	_ , contains := dstSubjects[testingSubjectKey]
+	_ , contains = dstSubjects[testingSubjectKey]
 	assert.Equal(t, 1, len(dstSubjects))
 	assert.True(t, contains)
 
 	cleanup()
+
 }
 
 func TestLocalMode(t *testing.T) {
@@ -136,15 +120,7 @@ func TestLocalMode(t *testing.T) {
 
 	assert.True(t,testLocalCopy(6))
 
-	cleanup()
-
-}
-
-func TestLocalModeWallowLists(t *testing.T) {
 	log.Println("Test Local Mode With Allow Lists!")
-
-	setImportMode()
-	setupSource()
 
 	client.DisallowList = nil
 	client.AllowList = map[string]bool{
@@ -153,15 +129,7 @@ func TestLocalModeWallowLists(t *testing.T) {
 
 	assert.True(t,testLocalCopy(3))
 
-	cleanup()
-
-}
-
-func TestLocalModeWdisallowLists(t *testing.T) {
 	log.Println("Test Local Mode With Disallow Lists!")
-
-	setImportMode()
-	setupSource()
 
 	client.AllowList = nil
 	client.DisallowList = map[string]bool{
@@ -170,8 +138,6 @@ func TestLocalModeWdisallowLists(t *testing.T) {
 
 	assert.True(t,testLocalCopy(3))
 
-	cleanup()
-
 }
 
 
@@ -179,98 +145,32 @@ func TestSyncMode(t *testing.T) {
 	log.Println("Test Sync Mode!")
 
 	client.TestHarnessRun = false
+	client.AllowList = nil
+	client.DisallowList = nil
 
 	setImportMode()
 	setupSource()
 
 	startAsyncRoutine()
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
-	// Assert schemas in dest deep equal schemas in src
-	srcSubjects := make (map[string][]int64)
-	destSubjects := make (map[string][]int64)
+	assert.True(t, testInitialSync(2))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+	assert.True(t, testRegistrationSync(2))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+	assert.True(t, testSoftDelete(2))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+	assert.True(t, testHardDeleteSync(6))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
-	srcChan := make(chan map[string][]int64)
-	destChan := make(chan map[string][]int64)
-
-	go testClientSrc.GetSubjectsWithVersions(srcChan)
-	go testClientDst.GetSubjectsWithVersions(destChan)
-
-	srcSubjects = <- srcChan
-	destSubjects = <- destChan
-
-	log.Println("Testing initial sync")
-	printSubjectTestResult(srcSubjects, destSubjects)
-
-	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
-
-	newRegister := client.SchemaRecord{
-		Subject: testingSubjectValue,
-		Schema:  newSchema,
-		SType:   "AVRO",
-		Version: 4,
-		Id:      100007,
-	}
-
-	log.Println("Testing registration sync")
-
-	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(newRegister.Schema,
-		newRegister.Subject,newRegister.Id,newRegister.Version,newRegister.SType)
-
-	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
-
-	// Assert schemas in dest deep equal schemas in src
-
-	go testClientSrc.GetSubjectsWithVersions(srcChan)
-	go testClientDst.GetSubjectsWithVersions(destChan)
-
-	srcSubjects = <- srcChan
-	destSubjects = <- destChan
-	printSubjectTestResult(srcSubjects, destSubjects)
-
-	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
-
-	log.Println(softDeleteLogMessage)
-
-	// inject a soft delete
-	testClientSrc.PerformSoftDelete(testingSubjectValue,1)
-	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
-
-	// Assert schemas in dest deep equal schemas in src
-
-	go testClientSrc.GetSubjectsWithVersions(srcChan)
-	go testClientDst.GetSubjectsWithVersions(destChan)
-
-	srcSubjects = <- srcChan
-	destSubjects = <- destChan
-	printSubjectTestResult(srcSubjects, destSubjects)
-
-	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
-
-	log.Println(hardDeleteLogMessage)
-
-	// inject a hard delete
-	testClientSrc.PerformHardDelete(testingSubjectValue,1)
-	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
-
-	// Assert schemas in dest deep equal schemas in src
+	log.Println("Testing hard delete sync for whole ID")
 
 	aChan := make(chan map[int64]map[string]int64)
 	bChan := make(chan map[int64]map[string]int64)
 	srcIDs := make(map[int64]map[string]int64)
 	dstIDs := make(map[int64]map[string]int64)
 
-	go testClientSrc.GetAllIDs(aChan)
-	go testClientDst.GetAllIDs(bChan)
-
-	srcIDs = <- aChan
-	dstIDs = <- bChan
-	printIDTestResult(srcIDs, dstIDs)
-
-	assert.True(t, reflect.DeepEqual(srcIDs, dstIDs))
-
-	log.Println("Testing hard delete sync for whole ID")
-
-	newRegister = client.SchemaRecord{
+	newRegister := client.SchemaRecord{
 		Subject: testingSubjectKey,
 		Schema:  newSchema,
 		SType:   "AVRO",
@@ -318,17 +218,10 @@ func TestSyncMode(t *testing.T) {
 	assert.True(t, reflect.DeepEqual(srcIDs, dstIDs))
 
 	killAsyncRoutine()
-
 	cleanup()
 
-}
-
-
-func TestSyncModeWallowLists(t *testing.T) {
 	log.Println("Test Sync Mode With Allow Lists!")
 	client.TestHarnessRun = false
-
-	setImportMode()
 	setupSource()
 
 	client.AllowList = map[string]bool{
@@ -337,27 +230,26 @@ func TestSyncModeWallowLists(t *testing.T) {
 	client.DisallowList = nil
 
 	startAsyncRoutine()
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
-	assert.True(t, testInitialSync())
+	assert.True(t, testInitialSync(1))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
-	assert.True(t, testRegistrationSync())
+	assert.True(t, testRegistrationSync(1))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
-	assert.True(t, testSoftDelete())
+	assert.True(t, testSoftDelete(1))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
-	assert.True(t, testHardDeleteSync())
+	assert.True(t, testHardDeleteSync(3))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	killAsyncRoutine()
 
 	cleanup()
 
-}
-
-
-func TestSyncModeWdisallowLists(t *testing.T) {
 	log.Println("Test Sync Mode With Allow Lists!")
 	client.TestHarnessRun = false
-
-	setImportMode()
 	setupSource()
 
 	client.AllowList = nil
@@ -366,19 +258,29 @@ func TestSyncModeWdisallowLists(t *testing.T) {
 	}
 
 	startAsyncRoutine()
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
-	assert.True(t, testInitialSync())
+	assert.True(t, testInitialSync(1))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
-	assert.True(t, testRegistrationSync())
+	assert.True(t, testRegistrationSync(1))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
-	assert.True(t, testSoftDelete())
+	assert.True(t, testSoftDelete(1))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
-	assert.True(t, testHardDeleteSync())
+	assert.True(t, testHardDeleteSync(3))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	killAsyncRoutine()
 
 	cleanup()
+
 }
+
+/*
+Helper methods for integration testing from now on.
+ */
 
 func startAsyncRoutine () {
 	// Start sync in another goroutine
@@ -403,7 +305,7 @@ func cleanup () {
 
 func printSubjectTestResult (srcSubjects map[string][]int64, destSubjects map[string][]int64) {
 	log.Printf("Source subject-version mapping contents: %v",srcSubjects)
-	log.Printf("Source subject-version mapping contents: %v",destSubjects)
+	log.Printf("Destination subject-version mapping contents: %v",destSubjects)
 }
 
 func printIDTestResult (srcIDs  map[int64]map[string]int64, dstIDs  map[int64]map[string]int64) {
@@ -473,7 +375,7 @@ func setImportMode () {
 	}
 }
 
-func testSoftDelete () bool {
+func testSoftDelete (lenOfDestSubjects int) bool {
 	log.Println(softDeleteLogMessage)
 
 	// Assert schemas in dest deep equal schemas in src
@@ -496,10 +398,10 @@ func testSoftDelete () bool {
 	destSubjects = <- destChan
 	printSubjectTestResult(srcSubjects, destSubjects)
 
-	return reflect.DeepEqual(srcSubjects, destSubjects) && len(destSubjects) == 1
+	return reflect.DeepEqual(srcSubjects, destSubjects) && len(destSubjects) == lenOfDestSubjects
 }
 
-func testInitialSync () bool  {
+func testInitialSync (lenOfDestSubjects int) bool  {
 	log.Println("Testing initial sync")
 	// Assert schemas in dest deep equal schemas in src
 	srcSubjects := make (map[string][]int64)
@@ -516,10 +418,10 @@ func testInitialSync () bool  {
 
 	printSubjectTestResult(srcSubjects, destSubjects)
 
-	return reflect.DeepEqual(srcSubjects, destSubjects) && (len(destSubjects) == 1)
+	return reflect.DeepEqual(srcSubjects, destSubjects) && (len(destSubjects) == lenOfDestSubjects)
 }
 
-func testRegistrationSync () bool {
+func testRegistrationSync (lenOfDestSubjects int) bool {
 	log.Println("Testing registration sync")
 
 	// Assert schemas in dest deep equal schemas in src
@@ -550,10 +452,10 @@ func testRegistrationSync () bool {
 	destSubjects = <- destChan
 	printSubjectTestResult(srcSubjects, destSubjects)
 
-	return reflect.DeepEqual(srcSubjects, destSubjects) && (len(destSubjects) == 1)
+	return reflect.DeepEqual(srcSubjects, destSubjects) && (len(destSubjects) == lenOfDestSubjects)
 }
 
-func testHardDeleteSync () bool {
+func testHardDeleteSync (lenOfDestIDs int) bool {
 
 	log.Println(hardDeleteLogMessage)
 
@@ -575,7 +477,7 @@ func testHardDeleteSync () bool {
 	dstIDs = <- bChan
 	printIDTestResult(srcIDs, dstIDs)
 
-	return reflect.DeepEqual(srcIDs, dstIDs) && (len(dstIDs) == 3)
+	return reflect.DeepEqual(srcIDs, dstIDs) && (len(dstIDs) == lenOfDestIDs)
 }
 
 func testLocalCopy (expectedFilesToWrite int) bool {

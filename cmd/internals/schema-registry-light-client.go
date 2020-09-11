@@ -306,9 +306,9 @@ func (src *SchemaRegistryClient) GetAllIDs (aChan chan <- map[int64]map[string]i
 		/*
 			Rate limit: In order not to saturate the SR instances, we limit the rate at which we send discovery requests.
 			The idea being that if one SR instance can handle the load, a cluster should be able to handle it
-			even more easily. During testing, it was found that 1ms is an ideal delay for best sync performance.
+			even more easily. During testing, it was found that 2ms is an ideal delay for best sync performance.
 		*/
-		time.Sleep(time.Duration(1) * time.Millisecond)
+		time.Sleep(time.Duration(2) * time.Millisecond)
 		go src.isID(i, aSubChan, &aGroup)
 	}
 	aGroup.Wait()

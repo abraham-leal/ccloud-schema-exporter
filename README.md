@@ -134,6 +134,8 @@ comma delimited entries for subject names (keep in mind these subjects must have
 These lists will be respected with schema sync, soft delete sync, and hard delete sync options.
 A subject specified in `-disallowList` and `-allowList` will be disallowed by default.
 
+NOTE: Lists aren't respected with the utility `-deleteAllFromDestination`
+
 #### A Note on syncing hard deletions
 
 Confluent's Schema Registry does not provide a good way to discover the full space of IDs registered.
@@ -144,6 +146,6 @@ This range is tunable by setting `-lowerBound` and `-upperBound` together with e
 
 Keep in mind syncing hard deletes does have a performance penalty on the sync. 
 Getting the latest snapshot of the state is an expensive operation.
-You can expect about a 5-second increase in sync time.
+You can expect about a 2-second increase in sync time.
 
 
