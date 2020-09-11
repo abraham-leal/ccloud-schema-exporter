@@ -103,3 +103,8 @@ func (i *StringArrayFlag) removeSpaces (str string) string {
 		return r
 	}, str)
 }
+
+type idSubjectVersion struct {
+	Id int64 `json:"Id"`
+	SubjectAndVersion map[string]int64 `json:"SubjectAndVersion"`
+}

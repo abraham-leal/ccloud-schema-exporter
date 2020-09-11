@@ -299,6 +299,7 @@ func (src *SchemaRegistryClient) GetAllIDs (aChan chan <- map[int64]map[string]i
 	src.InMemIDs = map[int64]map[string]int64{} // Map of ID -> (Map of subject -> Version)
 
 	var aGroup sync.WaitGroup
+	aSubChan := make(chan idSubjectVersion, 10000)
 	//Generate bounds
 	for i := LowerBound; i <= UpperBound; i++ {
 		aGroup.Add(1)
@@ -308,16 +309,22 @@ func (src *SchemaRegistryClient) GetAllIDs (aChan chan <- map[int64]map[string]i
 			even more easily. During testing, it was found that 1ms is an ideal delay for best sync performance.
 		*/
 		time.Sleep(time.Duration(1) * time.Millisecond)
-
-		go src.isID(i, &aGroup)
+		go src.isID(i, aSubChan, &aGroup)
 	}
 	aGroup.Wait()
+	close(aSubChan)
+
+	//Collect SubjectWithVersions
+	for item := range aSubChan {
+		src.InMemIDs[item.Id] = item.SubjectAndVersion
+	}
 
 	aChan <- src.InMemIDs
 
 }
 
-func (src *SchemaRegistryClient) isID ( id int64, wg *sync.WaitGroup) {
+func (src *SchemaRegistryClient) isID ( id int64, aChan chan <- idSubjectVersion, wg *sync.WaitGroup) {
+	answer := idSubjectVersion{}
 
 	httpClient := http.Client{
 		Timeout: time.Second * time.Duration(10),
@@ -337,17 +344,16 @@ func (src *SchemaRegistryClient) isID ( id int64, wg *sync.WaitGroup) {
 	check(err)
 
 	if res.StatusCode == 200 {
-		mutex.Lock()
 		json.Unmarshal(body, &manyPairs)
 		manyPairs = filterListedSubjectsVersions(manyPairs)
 		for _ , subjectVer := range manyPairs {
 			tempMapOfSubjectVersion[subjectVer.Subject] = subjectVer.Version
 		}
 		if len(tempMapOfSubjectVersion) != 0 { // Do not add IDs with empty subject-version references
-			src.InMemIDs[id] = tempMapOfSubjectVersion
+			answer.Id = id
+			answer.SubjectAndVersion = tempMapOfSubjectVersion
+			aChan <- answer
 		}
-
-		mutex.Unlock()
 	}
 
 	defer wg.Done()
