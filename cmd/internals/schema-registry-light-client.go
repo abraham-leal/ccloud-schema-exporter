@@ -328,6 +328,7 @@ func (src *SchemaRegistryClient) isID ( id int64, wg *sync.WaitGroup) {
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Println(err.Error())
+		return
 	}
 
 	var manyPairs []SubjectVersion
