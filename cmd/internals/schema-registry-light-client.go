@@ -82,8 +82,18 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[strin
 		log.Printf(err.Error())
 	}
 
+	// Convert back to slice for speed of iteration
+	filteredSubjects := []string{}
+	for key, _ := range filterListedSubjects(response) {
+		filteredSubjects = append(filteredSubjects, key)
+	}
+
+	response = filteredSubjects
+
+	// Start async fetching
+
 	var aGroup sync.WaitGroup
-	aChan := make(chan SubjectWithVersions, 1000)
+	aChan := make(chan SubjectWithVersions, 10000)
 
 	for _, s := range response {
 		aGroup.Add(1)
@@ -102,7 +112,7 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[strin
 	chanY <- src.InMemSchemas
 }
 
-func (src *SchemaRegistryClient) GetVersions (subject string, chanX chan <- SubjectWithVersions, wg *sync.WaitGroup) {
+func (src *SchemaRegistryClient) GetVersions(subject string, chanX chan <- SubjectWithVersions, wg *sync.WaitGroup) {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl,subject)
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
 
@@ -238,8 +248,20 @@ func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion (schema 
 func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently (){
 	destSubjects := make (map[string][]int64)
 	destChan := make(chan map[string][]int64)
+
+	// Account for allow/disallow lists, since this
+	// method is expected to delete ALL Schemas,
+	// The lists are not respected
+	holderAllow := AllowList
+	holderDisallow := DisallowList
+
+	AllowList = nil
+	DisallowList = nil
 	go src.GetSubjectsWithVersions(destChan)
 	destSubjects = <- destChan
+
+	AllowList = holderAllow
+	DisallowList = holderDisallow
 
 	//Must perform soft delete before hard delete
 	for subject, versions := range destSubjects {
@@ -277,6 +299,7 @@ func (src *SchemaRegistryClient) GetAllIDs (aChan chan <- map[int64]map[string]i
 	src.InMemIDs = map[int64]map[string]int64{} // Map of ID -> (Map of subject -> Version)
 
 	var aGroup sync.WaitGroup
+	aSubChan := make(chan idSubjectVersion, 10000)
 	//Generate bounds
 	for i := LowerBound; i <= UpperBound; i++ {
 		aGroup.Add(1)
@@ -286,16 +309,22 @@ func (src *SchemaRegistryClient) GetAllIDs (aChan chan <- map[int64]map[string]i
 			even more easily. During testing, it was found that 1ms is an ideal delay for best sync performance.
 		*/
 		time.Sleep(time.Duration(1) * time.Millisecond)
-
-		go src.isID(i, &aGroup)
+		go src.isID(i, aSubChan, &aGroup)
 	}
 	aGroup.Wait()
+	close(aSubChan)
+
+	//Collect SubjectWithVersions
+	for item := range aSubChan {
+		src.InMemIDs[item.Id] = item.SubjectAndVersion
+	}
 
 	aChan <- src.InMemIDs
 
 }
 
-func (src *SchemaRegistryClient) isID ( id int64, wg *sync.WaitGroup) {
+func (src *SchemaRegistryClient) isID ( id int64, aChan chan <- idSubjectVersion, wg *sync.WaitGroup) {
+	answer := idSubjectVersion{}
 
 	httpClient := http.Client{
 		Timeout: time.Second * time.Duration(10),
@@ -306,20 +335,25 @@ func (src *SchemaRegistryClient) isID ( id int64, wg *sync.WaitGroup) {
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Println(err.Error())
+		return
 	}
 
 	var manyPairs []SubjectVersion
 	var tempMapOfSubjectVersion = map[string]int64{}
 	body, err := ioutil.ReadAll(res.Body)
+	check(err)
 
 	if res.StatusCode == 200 {
-		mutex.Lock()
 		json.Unmarshal(body, &manyPairs)
+		manyPairs = filterListedSubjectsVersions(manyPairs)
 		for _ , subjectVer := range manyPairs {
 			tempMapOfSubjectVersion[subjectVer.Subject] = subjectVer.Version
 		}
-		src.InMemIDs[id] = tempMapOfSubjectVersion
-		mutex.Unlock()
+		if len(tempMapOfSubjectVersion) != 0 { // Do not add IDs with empty subject-version references
+			answer.Id = id
+			answer.SubjectAndVersion = tempMapOfSubjectVersion
+			aChan <- answer
+		}
 	}
 
 	defer wg.Done()
@@ -344,4 +378,65 @@ func handleNotSuccess (body io.Reader, statusCode int, method string, endpoint s
 		errorMsg := fmt.Sprintf(statusError, statusCode, method, endpoint)
 		log.Printf("ERROR: %s, HTTP Response: %s",errorMsg, string(body))
 	}
+}
+
+func filterListedSubjects (response []string) map[string]bool {
+	// Start allow list work
+	subjectMap := map[string]bool{}
+
+	for _ ,s := range response { // Generate a map of subjects for easier manipulation
+		subjectMap[s] = true
+	}
+
+	for s, _ := range subjectMap { // Filter out for allow lists
+		if AllowList != nil { // If allow list is defined
+			_, allowContains := AllowList[s]
+			if !allowContains { // If allow list does not contain it, delete it
+				delete(subjectMap, s)
+			}
+		}
+		if DisallowList != nil { // If disallow list is defined
+			_, disallowContains := DisallowList[s]
+			if disallowContains { // If disallow list contains it, delete it
+				delete(subjectMap, s)
+			}
+		}
+	}
+
+	return subjectMap
+}
+
+
+func filterListedSubjectsVersions (response []SubjectVersion) []SubjectVersion {
+	subjectMap := map[string]int64{}
+
+	for _ ,s := range response { // Generate a map of subjects for easier manipulation
+		subjectMap[s.Subject] = s.Version
+	}
+
+	for s, _ := range subjectMap { // Filter out for allow lists
+		if AllowList != nil { // If allow list is defined
+			_, allowContains := AllowList[s]
+			if !allowContains { // If allow list does not contain it, delete it
+				delete(subjectMap, s)
+			}
+		}
+		if DisallowList != nil { // If disallow list is defined
+			_, disallowContains := DisallowList[s]
+			if disallowContains { // If disallow list contains it, delete it
+				delete(subjectMap, s)
+			}
+		}
+	}
+
+	subjectVersionSlice := []SubjectVersion{}
+	for s, v := range subjectMap {
+		tempSubjVer := SubjectVersion{
+			Subject: s,
+			Version: v,
+		}
+		subjectVersionSlice = append(subjectVersionSlice, tempSubjVer)
+	}
+
+	return subjectVersionSlice
 }

@@ -16,8 +16,13 @@ import (
 var composeEnv *testcontainers.LocalDockerCompose
 var testClientSrc *client.SchemaRegistryClient
 var testClientDst *client.SchemaRegistryClient
-var testingSubject1 = "someSubject-value"
-var testingSubject2 = "someSubject-key"
+var testingSubjectValue = "someSubject-value"
+var testingSubjectKey = "someSubject-key"
+var softDeleteLogMessage = "Testing soft delete sync"
+var hardDeleteLogMessage = "Testing hard delete sync"
+var newSchema = "{\"type\":\"record\",\"name\":\"value_newnew\",\"namespace\":\"com.mycorp.mynamespace\",\"doc\":\"Sample schema to help you get started.\",\"fields\":[{\"name\":\"this\",\"type\":\"int\",\"doc\":\"The int type is a 32-bit signed integer.\"},{\"default\": null,\"name\": \"onefield\",\"type\": [\"null\",\"string\"]}]}"
+var localRelativePath = "/testingLocalBackupRelativePath"
+var localAbsPath = "/tmp/testingLocalBackupAbsPath"
 
 func TestMain(m *testing.M) {
 	setup()
@@ -40,62 +45,6 @@ func setup () {
 	testClientSrc = client.NewSchemaRegistryClient("http://localhost:8081","testUser", "testPass", "src")
 	testClientDst = client.NewSchemaRegistryClient("http://localhost:8082","testUser", "testPass", "dst")
 
-	if testClientSrc.IsReachable() && testClientDst.IsReachable() {
-		// Set up our source registry
-		subjects := []string{testingSubject1,testingSubject2}
-		id := int64(100001)
-		versions := []int64{1, 2, 3}
-
-		err := testClientSrc.SetMode("IMPORT")
-		if err == false {
-			log.Println("Could not set source registry to IMPORT ModeRecord.")
-			os.Exit(0)
-		}
-
-		schema := "{\"type\": \"record\",\"namespace\": \"com.mycorp.mynamespace\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"},{\"name\": \"too\",\"type\": \"string\",\"doc\": \"The string is a unicode character sequence.\"}]}"
-
-		schema2 := "{\"type\": \"record\",\"namespace\": \"com.mycorp.mynamespace\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"}]}"
-
-		schema3 := 	"{\"type\": \"record\",\"namespace\": \"com.mycorp.mynamespace\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
-
-		schema4 := "{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"},{\"name\": \"too\",\"type\": \"string\",\"doc\": \"The string is a unicode character sequence.\"}]}"
-
-		schema5 := "{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"}]}"
-
-		schema6 := 	"{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
-
-		schemas := []string{schema, schema2, schema3, schema4, schema5, schema6}
-		counter := 1
-
-		for _, subject := range subjects {
-			for _ , version := range versions {
-
-				currentRecord := client.SchemaRecord{
-					Subject: subject,
-					Schema:  schemas[counter-1],
-					SType:   "AVRO",
-					Version: version,
-					Id:      id,
-				}
-
-				testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(
-					currentRecord.Schema,
-					currentRecord.Subject,
-					currentRecord.Id,
-					currentRecord.Version,
-					"AVRO")
-
-				log.Printf("Registering schema with subject %s, version %d, and id %d", currentRecord.Subject, currentRecord.Version, currentRecord.Id)
-				id = id + 1
-				counter++
-			}
-		}
-
-	} else {
-		panic("Could not find Schema Registries")
-	}
-
-	time.Sleep(time.Duration(5) * time.Second) // Allow registration catch up
 }
 
 func tearDown () {
@@ -105,13 +54,8 @@ func tearDown () {
 func TestExportMode(t *testing.T) {
 	log.Println("Test Export Mode!")
 
-	if !testClientDst.IsImportModeReady() {
-		err := testClientDst.SetMode("IMPORT")
-		if err == false {
-			log.Println("Could not set destination registry to IMPORT ModeRecord.")
-			os.Exit(0)
-		}
-	}
+	setImportMode()
+	setupSource()
 
 	client.BatchExport(testClientSrc,testClientDst)
 
@@ -126,38 +70,107 @@ func TestExportMode(t *testing.T) {
 
 	assert.True(t,reflect.DeepEqual(srcSubjects,dstSubjects))
 
-	testClientDst.DeleteAllSubjectsPermanently()
-	time.Sleep(time.Duration(1) * time.Second) // Allow time for deletes to complete
+	cleanup()
+}
+
+func TestExportModeWallowLists(t *testing.T) {
+	log.Println("Test Export Mode with Allow Lists!")
+
+	setImportMode()
+	setupSource()
+
+	client.AllowList = map[string]bool{
+		testingSubjectKey: true,
+	}
+	client.DisallowList = nil
+
+	client.BatchExport(testClientSrc,testClientDst)
+
+	dstChan := make(chan map[string][]int64)
+
+	go testClientDst.GetSubjectsWithVersions(dstChan)
+
+	dstSubjects := <- dstChan
+
+	_ , contains := dstSubjects[testingSubjectKey]
+	assert.Equal(t, 1, len(dstSubjects))
+	assert.True(t, contains)
+
+	cleanup()
+}
+
+func TestExportModeWdisallowLists(t *testing.T) {
+	log.Println("Test Export Mode with Disallow Lists!")
+
+	setImportMode()
+	setupSource()
+
+	client.AllowList = nil
+	client.DisallowList = map[string]bool{
+		testingSubjectValue: true,
+	}
+
+	client.BatchExport(testClientSrc,testClientDst)
+
+	dstChan := make(chan map[string][]int64)
+
+	go testClientDst.GetSubjectsWithVersions(dstChan)
+
+	dstSubjects := <- dstChan
+
+	_ , contains := dstSubjects[testingSubjectKey]
+	assert.Equal(t, 1, len(dstSubjects))
+	assert.True(t, contains)
+
+	cleanup()
 }
 
 func TestLocalMode(t *testing.T) {
 	log.Println("Test Local Mode!")
-	currentPath, _ := os.Executable()
-	relativePathToTest := "/testingLocalBackupRelativePath"
-	absPathToTest := "/tmp/testingLocalBackupAbsPath"
 
-	// Test Relative Paths
-	err := os.Mkdir(filepath.Dir(currentPath)+relativePathToTest, 0755)
-	if err != nil {
-		panic(err)
+	setImportMode()
+	setupSource()
+
+	client.DisallowList = nil
+	client.AllowList = nil
+
+	assert.True(t,testLocalCopy(6))
+
+	cleanup()
+
+}
+
+func TestLocalModeWallowLists(t *testing.T) {
+	log.Println("Test Local Mode With Allow Lists!")
+
+	setImportMode()
+	setupSource()
+
+	client.DisallowList = nil
+	client.AllowList = map[string]bool{
+		testingSubjectValue: true,
 	}
 
-	defer os.RemoveAll(filepath.Dir(currentPath)+relativePathToTest)
-	client.WriteToFS(testClientSrc, "testingLocalBackupRelativePath")
+	assert.True(t,testLocalCopy(3))
 
-	files, err2 := ioutil.ReadDir(filepath.Dir(currentPath)+relativePathToTest)
-	if err2 != nil {
-		panic(err2)
+	cleanup()
+
+}
+
+func TestLocalModeWdisallowLists(t *testing.T) {
+	log.Println("Test Local Mode With Disallow Lists!")
+
+	setImportMode()
+	setupSource()
+
+	client.AllowList = nil
+	client.DisallowList = map[string]bool{
+		testingSubjectValue: true,
 	}
-	assert.Equal(t,6,len(files))
 
-	// Test Absolute Paths
-	_ = os.Mkdir(absPathToTest, 0755)
-	defer os.RemoveAll(absPathToTest)
-	client.WriteToFS(testClientSrc, absPathToTest)
+	assert.True(t,testLocalCopy(3))
 
-	files2,_ := ioutil.ReadDir(absPathToTest)
-	assert.Equal(t,6,len(files2))
+	cleanup()
 
 }
 
@@ -165,18 +178,12 @@ func TestLocalMode(t *testing.T) {
 func TestSyncMode(t *testing.T) {
 	log.Println("Test Sync Mode!")
 
-	// Set mode
-	if !testClientDst.IsImportModeReady() {
-		err := testClientDst.SetMode("IMPORT")
-		if err == false {
-			log.Println("Could not set destination registry to IMPORT ModeRecord.")
-			os.Exit(0)
-		}
-	}
+	client.TestHarnessRun = false
 
-	// Start sync in another goroutine
-	go client.Sync(testClientSrc,testClientDst)
-	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
+	setImportMode()
+	setupSource()
+
+	startAsyncRoutine()
 
 	// Assert schemas in dest deep equal schemas in src
 	srcSubjects := make (map[string][]int64)
@@ -196,12 +203,9 @@ func TestSyncMode(t *testing.T) {
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
 
-	// inject a new write
-	schema := "{\"type\":\"record\",\"name\":\"value_newnew\",\"namespace\":\"com.mycorp.mynamespace\",\"doc\":\"Sample schema to help you get started.\",\"fields\":[{\"name\":\"this\",\"type\":\"int\",\"doc\":\"The int type is a 32-bit signed integer.\"},{\"default\": null,\"name\": \"onefield\",\"type\": [\"null\",\"string\"]}]}"
-
 	newRegister := client.SchemaRecord{
-		Subject: testingSubject1,
-		Schema:  schema,
+		Subject: testingSubjectValue,
+		Schema:  newSchema,
 		SType:   "AVRO",
 		Version: 4,
 		Id:      100007,
@@ -225,10 +229,10 @@ func TestSyncMode(t *testing.T) {
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
 
-	log.Println("Testing soft delete sync")
+	log.Println(softDeleteLogMessage)
 
 	// inject a soft delete
-	testClientSrc.PerformSoftDelete(testingSubject1,1)
+	testClientSrc.PerformSoftDelete(testingSubjectValue,1)
 	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 
 	// Assert schemas in dest deep equal schemas in src
@@ -242,10 +246,10 @@ func TestSyncMode(t *testing.T) {
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
 
-	log.Println("Testing hard delete sync for subject")
+	log.Println(hardDeleteLogMessage)
 
 	// inject a hard delete
-	testClientSrc.PerformHardDelete(testingSubject1,1)
+	testClientSrc.PerformHardDelete(testingSubjectValue,1)
 	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 
 	// Assert schemas in dest deep equal schemas in src
@@ -267,8 +271,8 @@ func TestSyncMode(t *testing.T) {
 	log.Println("Testing hard delete sync for whole ID")
 
 	newRegister = client.SchemaRecord{
-		Subject: testingSubject2,
-		Schema:  schema,
+		Subject: testingSubjectKey,
+		Schema:  newSchema,
 		SType:   "AVRO",
 		Version: 4,
 		Id:      100007,
@@ -286,8 +290,8 @@ func TestSyncMode(t *testing.T) {
 	printIDTestResult(srcIDs, dstIDs)
 
 	// inject a hard delete
-	testClientSrc.PerformSoftDelete(testingSubject1,4)
-	testClientSrc.PerformHardDelete(testingSubject1,4)
+	testClientSrc.PerformSoftDelete(testingSubjectValue,4)
+	testClientSrc.PerformHardDelete(testingSubjectValue,4)
 	time.Sleep(time.Duration(11) * time.Second) // Give time for sync
 
 	go testClientSrc.GetAllIDs(aChan)
@@ -297,8 +301,8 @@ func TestSyncMode(t *testing.T) {
 	dstIDs = <- bChan
 	printIDTestResult(srcIDs, dstIDs)
 
-	testClientSrc.PerformSoftDelete(testingSubject2,4)
-	testClientSrc.PerformHardDelete(testingSubject2,4)
+	testClientSrc.PerformSoftDelete(testingSubjectKey,4)
+	testClientSrc.PerformHardDelete(testingSubjectKey,4)
 	time.Sleep(time.Duration(11) * time.Second) // Give time for sync
 
 	// Assert schemas in dest deep equal schemas in src
@@ -313,14 +317,88 @@ func TestSyncMode(t *testing.T) {
 
 	assert.True(t, reflect.DeepEqual(srcIDs, dstIDs))
 
+	killAsyncRoutine()
+
+	cleanup()
+
+}
+
+
+func TestSyncModeWallowLists(t *testing.T) {
+	log.Println("Test Sync Mode With Allow Lists!")
+	client.TestHarnessRun = false
+
+	setImportMode()
+	setupSource()
+
+	client.AllowList = map[string]bool{
+		testingSubjectKey: true,
+	}
+	client.DisallowList = nil
+
+	startAsyncRoutine()
+
+	assert.True(t, testInitialSync())
+
+	assert.True(t, testRegistrationSync())
+
+	assert.True(t, testSoftDelete())
+
+	assert.True(t, testHardDeleteSync())
+
+	killAsyncRoutine()
+
+	cleanup()
+
+}
+
+
+func TestSyncModeWdisallowLists(t *testing.T) {
+	log.Println("Test Sync Mode With Allow Lists!")
+	client.TestHarnessRun = false
+
+	setImportMode()
+	setupSource()
+
+	client.AllowList = nil
+	client.DisallowList = map[string]bool{
+		testingSubjectValue: true,
+	}
+
+	startAsyncRoutine()
+
+	assert.True(t, testInitialSync())
+
+	assert.True(t, testRegistrationSync())
+
+	assert.True(t, testSoftDelete())
+
+	assert.True(t, testHardDeleteSync())
+
+	killAsyncRoutine()
+
+	cleanup()
+}
+
+func startAsyncRoutine () {
+	// Start sync in another goroutine
+	go client.Sync(testClientSrc,testClientDst)
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
+}
+
+func killAsyncRoutine () {
 	log.Println("Killing sync goroutine")
 	client.TestHarnessRun = true
 	time.Sleep(time.Duration(3) * time.Second) // Give thread time to die
+}
 
-	log.Println("Clean up destination SR")
+func cleanup () {
+	log.Println("Clean up SRs")
 	testClientDst.DeleteAllSubjectsPermanently()
+	testClientSrc.DeleteAllSubjectsPermanently()
+	log.Println("Reset source destination SR")
+	setupSource()
 	time.Sleep(time.Duration(3) * time.Second) // Allow time for deletes to complete
-
 }
 
 func printSubjectTestResult (srcSubjects map[string][]int64, destSubjects map[string][]int64) {
@@ -331,4 +409,199 @@ func printSubjectTestResult (srcSubjects map[string][]int64, destSubjects map[st
 func printIDTestResult (srcIDs  map[int64]map[string]int64, dstIDs  map[int64]map[string]int64) {
 	log.Printf("Source IDs contents: %v", srcIDs)
 	log.Printf("Destination IDs contents: %v", dstIDs)
+}
+
+func setupSource () {
+	// Set up our source registry
+	subjects := []string{testingSubjectValue, testingSubjectKey}
+	id := int64(100001)
+	versions := []int64{1, 2, 3}
+
+	schema := "{\"type\": \"record\",\"namespace\": \"com.mycorp.mynamespace\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"},{\"name\": \"too\",\"type\": \"string\",\"doc\": \"The string is a unicode character sequence.\"}]}"
+
+	schema2 := "{\"type\": \"record\",\"namespace\": \"com.mycorp.mynamespace\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"}]}"
+
+	schema3 := 	"{\"type\": \"record\",\"namespace\": \"com.mycorp.mynamespace\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
+
+	schema4 := "{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"},{\"name\": \"too\",\"type\": \"string\",\"doc\": \"The string is a unicode character sequence.\"}]}"
+
+	schema5 := "{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"}]}"
+
+	schema6 := 	"{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
+
+	schemas := []string{schema, schema2, schema3, schema4, schema5, schema6}
+	counter := 1
+
+	for _, subject := range subjects {
+		for _ , version := range versions {
+
+			currentRecord := client.SchemaRecord{
+				Subject: subject,
+				Schema:  schemas[counter-1],
+				SType:   "AVRO",
+				Version: version,
+				Id:      id,
+			}
+
+			testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(
+				currentRecord.Schema,
+				currentRecord.Subject,
+				currentRecord.Id,
+				currentRecord.Version,
+				"AVRO")
+
+			log.Printf("Registering schema with subject %s, version %d, and id %d", currentRecord.Subject, currentRecord.Version, currentRecord.Id)
+			id = id + 1
+			counter++
+		}
+	}
+}
+
+func setImportMode () {
+	if !testClientDst.IsImportModeReady() {
+		err := testClientDst.SetMode("IMPORT")
+		if err == false {
+			log.Fatalln("Could not set destination registry to IMPORT ModeRecord.")
+		}
+	}
+
+	if !testClientSrc.IsImportModeReady() {
+		err := testClientSrc.SetMode("IMPORT")
+		if err == false {
+			log.Fatalln("Could not set source registry to IMPORT ModeRecord.")
+		}
+	}
+}
+
+func testSoftDelete () bool {
+	log.Println(softDeleteLogMessage)
+
+	// Assert schemas in dest deep equal schemas in src
+	srcSubjects := make (map[string][]int64)
+	destSubjects := make (map[string][]int64)
+
+	srcChan := make(chan map[string][]int64)
+	destChan := make(chan map[string][]int64)
+
+	// inject a soft delete
+	testClientSrc.PerformSoftDelete(testingSubjectKey,1)
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
+
+	// Assert schemas in dest deep equal schemas in src
+
+	go testClientSrc.GetSubjectsWithVersions(srcChan)
+	go testClientDst.GetSubjectsWithVersions(destChan)
+
+	srcSubjects = <- srcChan
+	destSubjects = <- destChan
+	printSubjectTestResult(srcSubjects, destSubjects)
+
+	return reflect.DeepEqual(srcSubjects, destSubjects) && len(destSubjects) == 1
+}
+
+func testInitialSync () bool  {
+	log.Println("Testing initial sync")
+	// Assert schemas in dest deep equal schemas in src
+	srcSubjects := make (map[string][]int64)
+	destSubjects := make (map[string][]int64)
+
+	srcChan := make(chan map[string][]int64)
+	destChan := make(chan map[string][]int64)
+
+	go testClientSrc.GetSubjectsWithVersions(srcChan)
+	go testClientDst.GetSubjectsWithVersions(destChan)
+
+	srcSubjects = <- srcChan
+	destSubjects = <- destChan
+
+	printSubjectTestResult(srcSubjects, destSubjects)
+
+	return reflect.DeepEqual(srcSubjects, destSubjects) && (len(destSubjects) == 1)
+}
+
+func testRegistrationSync () bool {
+	log.Println("Testing registration sync")
+
+	// Assert schemas in dest deep equal schemas in src
+	srcSubjects := make (map[string][]int64)
+	destSubjects := make (map[string][]int64)
+
+	srcChan := make(chan map[string][]int64)
+	destChan := make(chan map[string][]int64)
+
+	newRegister := client.SchemaRecord{
+		Subject: testingSubjectKey,
+		Schema:  newSchema,
+		SType:   "AVRO",
+		Version: 4,
+		Id:      100007,
+	}
+	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(newRegister.Schema,
+		newRegister.Subject,newRegister.Id,newRegister.Version,newRegister.SType)
+
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
+
+	// Assert schemas in dest deep equal schemas in src
+
+	go testClientSrc.GetSubjectsWithVersions(srcChan)
+	go testClientDst.GetSubjectsWithVersions(destChan)
+
+	srcSubjects = <- srcChan
+	destSubjects = <- destChan
+	printSubjectTestResult(srcSubjects, destSubjects)
+
+	return reflect.DeepEqual(srcSubjects, destSubjects) && (len(destSubjects) == 1)
+}
+
+func testHardDeleteSync () bool {
+
+	log.Println(hardDeleteLogMessage)
+
+	// inject a hard delete
+	testClientSrc.PerformHardDelete(testingSubjectKey,1)
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
+
+	// Assert schemas in dest deep equal schemas in src
+
+	aChan := make(chan map[int64]map[string]int64)
+	bChan := make(chan map[int64]map[string]int64)
+	srcIDs := make(map[int64]map[string]int64)
+	dstIDs := make(map[int64]map[string]int64)
+
+	go testClientSrc.GetAllIDs(aChan)
+	go testClientDst.GetAllIDs(bChan)
+
+	srcIDs = <- aChan
+	dstIDs = <- bChan
+	printIDTestResult(srcIDs, dstIDs)
+
+	return reflect.DeepEqual(srcIDs, dstIDs) && (len(dstIDs) == 3)
+}
+
+func testLocalCopy (expectedFilesToWrite int) bool {
+
+	currentPath, _ := os.Getwd()
+
+	// Test Relative Paths
+	err := os.Mkdir(filepath.Dir(currentPath)+localRelativePath, 0755)
+	if err != nil {
+		panic(err)
+	}
+
+	defer os.RemoveAll(filepath.Dir(currentPath)+localRelativePath)
+	client.WriteToFS(testClientSrc, "testingLocalBackupRelativePath")
+
+	files, err2 := ioutil.ReadDir(filepath.Dir(currentPath)+localRelativePath)
+	if err2 != nil {
+		panic(err2)
+	}
+
+	// Test Absolute Paths
+	_ = os.Mkdir(localAbsPath, 0755)
+	defer os.RemoveAll(localAbsPath)
+	client.WriteToFS(testClientSrc, localAbsPath)
+
+	files2,_ := ioutil.ReadDir(localAbsPath)
+
+	return (len(files2) == expectedFilesToWrite) && (len(files) == expectedFilesToWrite)
 }

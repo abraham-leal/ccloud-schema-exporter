@@ -27,3 +27,5 @@ var PathToWrite string
 var TestHarnessRun bool
 var LowerBound int64
 var UpperBound int64
+var AllowList StringArrayFlag
+var DisallowList StringArrayFlag

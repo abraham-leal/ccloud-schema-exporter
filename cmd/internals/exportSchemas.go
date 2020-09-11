@@ -1,5 +1,10 @@
 package client
 
+//
+// exportSchemas.go
+// Author: Abraham Leal
+//
+
 import (
 	"log"
 )

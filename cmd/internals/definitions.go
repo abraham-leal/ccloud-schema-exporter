@@ -1,9 +1,16 @@
 package client
 
 //
-// structures.go
+// definitions.go
 // Author: Abraham Leal
 //
+
+import (
+	"fmt"
+	"io/ioutil"
+	"strings"
+	"unicode"
+)
 
 type SchemaRegistryClient struct {
 	SRUrl        string
@@ -56,4 +63,48 @@ type SubjectWithVersions struct {
 type SubjectVersion struct {
 	Subject string `json:"subject"`
 	Version int64 `json:"version"`
+}
+
+type StringArrayFlag map[string]bool
+
+func (i *StringArrayFlag) String() string {
+	return fmt.Sprintln(*i)
+}
+
+func (i *StringArrayFlag) Set(value string) error {
+
+	if strings.LastIndexAny(value,"/.") != -1 {
+		path := CheckPath(value)
+		f , err := ioutil.ReadFile(path)
+		if err != nil {
+			panic(err)
+		}
+		value = string(f)
+	}
+
+	nospaces := i.removeSpaces(value)
+
+	tempMap := map[string]bool{}
+
+	for _, s := range strings.Split(nospaces,",") {
+		tempMap[s] = true
+	}
+
+	*i = tempMap
+
+	return nil
+}
+
+func (i *StringArrayFlag) removeSpaces (str string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+		return r
+	}, str)
+}
+
+type idSubjectVersion struct {
+	Id int64 `json:"Id"`
+	SubjectAndVersion map[string]int64 `json:"SubjectAndVersion"`
 }

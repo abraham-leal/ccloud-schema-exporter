@@ -1,5 +1,10 @@
 package client
 
+//
+// schema-registry-light-client-test.go
+// Author: Abraham Leal
+//
+
 import (
 	"encoding/json"
 	"github.com/dankinder/httpmock"

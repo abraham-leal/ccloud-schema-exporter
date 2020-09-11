@@ -1,5 +1,10 @@
 package client
 
+//
+// writeToLocal.go
+// Author: Abraham Leal
+//
+
 import (
 	"fmt"
 	"log"
@@ -10,27 +15,7 @@ import (
 
 func WriteToFS (srcClient *SchemaRegistryClient, definedPath string) {
 
-	currentPath, _ := os.Executable()
-
-	if definedPath == "" {
-		log.Println("Path not defined, writing to new local folder SchemaRegistryBackup")
-		_ = os.Mkdir("SchemaRegistryBackup", 0755)
-		definedPath = filepath.Join(filepath.Dir(currentPath), "SchemaRegistryBackup")
-	} else {
-		if filepath.IsAbs(definedPath){
-			if _, err := os.Stat(definedPath); os.IsNotExist(err) {
-				log.Println("Path: " + definedPath)
-				log.Fatalln("The directory specified does not exist.")
-			}
-		} else {
-			definedPath = filepath.Join(filepath.Dir(currentPath),definedPath)
-			_, err := os.Stat(definedPath)
-			if os.IsNotExist(err) {
-				log.Println("Path: " + definedPath)
-				log.Fatalln("The directory specified does not exist.")
-			}
-		}
-	}
+	definedPath = CheckPath(definedPath)
 
 	srcChan := make(chan map[string][]int64)
 	go srcClient.GetSubjectsWithVersions(srcChan)
@@ -65,6 +50,33 @@ func writeSchema (srcClient *SchemaRegistryClient, pathToWrite string, subject s
 	_ = f.Sync()
 
 	wg.Done()
+}
+
+func CheckPath (definedPath string) string {
+
+	currentPath, _ := os.Getwd()
+
+	if definedPath == "" {
+		log.Println("Path not defined, writing to new local folder SchemaRegistryBackup")
+		_ = os.Mkdir("SchemaRegistryBackup", 0755)
+		definedPath = filepath.Join(filepath.Dir(currentPath), "SchemaRegistryBackup")
+		return definedPath
+	} else {
+		if filepath.IsAbs(definedPath){
+			if _, err := os.Stat(definedPath); os.IsNotExist(err) {
+				log.Println("Path: " + definedPath)
+				log.Fatalln("The directory specified does not exist.")
+			}
+		} else {
+			definedPath = filepath.Join(filepath.Dir(currentPath),definedPath)
+			_, err := os.Stat(definedPath)
+			if os.IsNotExist(err) {
+				log.Println("Path: " + definedPath)
+				log.Fatalln("The directory specified does not exist.")
+			}
+		}
+		return definedPath
+	}
 }
 
 func check (e error){
