@@ -145,17 +145,23 @@ func TestSyncMode(t *testing.T) {
 	log.Println("Test Sync Mode!")
 
 	client.TestHarnessRun = false
+	client.AllowList = nil
+	client.DisallowList = nil
 
 	setImportMode()
 	setupSource()
 
 	startAsyncRoutine()
-
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	assert.True(t, testInitialSync(2))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 	assert.True(t, testRegistrationSync(2))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 	assert.True(t, testSoftDelete(2))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 	assert.True(t, testHardDeleteSync(6))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	log.Println("Testing hard delete sync for whole ID")
 
@@ -224,14 +230,19 @@ func TestSyncMode(t *testing.T) {
 	client.DisallowList = nil
 
 	startAsyncRoutine()
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	assert.True(t, testInitialSync(1))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	assert.True(t, testRegistrationSync(1))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	assert.True(t, testSoftDelete(1))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	assert.True(t, testHardDeleteSync(3))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	killAsyncRoutine()
 
@@ -247,14 +258,19 @@ func TestSyncMode(t *testing.T) {
 	}
 
 	startAsyncRoutine()
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	assert.True(t, testInitialSync(1))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	assert.True(t, testRegistrationSync(1))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	assert.True(t, testSoftDelete(1))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	assert.True(t, testHardDeleteSync(3))
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	killAsyncRoutine()
 
@@ -289,7 +305,7 @@ func cleanup () {
 
 func printSubjectTestResult (srcSubjects map[string][]int64, destSubjects map[string][]int64) {
 	log.Printf("Source subject-version mapping contents: %v",srcSubjects)
-	log.Printf("Source subject-version mapping contents: %v",destSubjects)
+	log.Printf("Destination subject-version mapping contents: %v",destSubjects)
 }
 
 func printIDTestResult (srcIDs  map[int64]map[string]int64, dstIDs  map[int64]map[string]int64) {

@@ -12,6 +12,7 @@ script:
   - docker pull confluentinc/cp-zookeeper:5.5.1
   - docker pull confluentinc/cp-server:5.5.1
   - docker pull confluentinc/cp-schema-registry:5.5.1
+  - go build cmd/ccloud-schema-exporter/ccloud-schema-exporter.go
   - cd cmd/integrationTests
   - docker-compose up -d
   - go test
