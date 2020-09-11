@@ -321,6 +321,7 @@ func (src *SchemaRegistryClient) isID ( id int64, wg *sync.WaitGroup) {
 	var manyPairs []SubjectVersion
 	var tempMapOfSubjectVersion = map[string]int64{}
 	body, err := ioutil.ReadAll(res.Body)
+	check(err)
 
 	if res.StatusCode == 200 {
 		mutex.Lock()
