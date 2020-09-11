@@ -183,9 +183,7 @@ func TestSyncMode(t *testing.T) {
 	setImportMode()
 	setupSource()
 
-	// Start sync in another goroutine
-	go client.Sync(testClientSrc,testClientDst)
-	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
+	startAsyncRoutine()
 
 	// Assert schemas in dest deep equal schemas in src
 	srcSubjects := make (map[string][]int64)
@@ -338,11 +336,7 @@ func TestSyncModeWallowLists(t *testing.T) {
 	}
 	client.DisallowList = nil
 
-	setImportMode()
-
-	// Start sync in another goroutine
-	go client.Sync(testClientSrc,testClientDst)
-	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
+	startAsyncRoutine()
 
 	assert.True(t, testInitialSync())
 
@@ -371,11 +365,7 @@ func TestSyncModeWdisallowLists(t *testing.T) {
 		testingSubjectValue: true,
 	}
 
-	setImportMode()
-
-	// Start sync in another goroutine
-	go client.Sync(testClientSrc,testClientDst)
-	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
+	startAsyncRoutine()
 
 	assert.True(t, testInitialSync())
 
@@ -388,6 +378,12 @@ func TestSyncModeWdisallowLists(t *testing.T) {
 	killAsyncRoutine()
 
 	cleanup()
+}
+
+func startAsyncRoutine () {
+	// Start sync in another goroutine
+	go client.Sync(testClientSrc,testClientDst)
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 }
 
 func killAsyncRoutine () {

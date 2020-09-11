@@ -248,8 +248,20 @@ func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion (schema 
 func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently (){
 	destSubjects := make (map[string][]int64)
 	destChan := make(chan map[string][]int64)
+
+	// Account for allow/disallow lists, since this
+	// method is expected to delete ALL Schemas,
+	// The lists are not respected
+	holderAllow := AllowList
+	holderDisallow := DisallowList
+
+	AllowList = nil
+	DisallowList = nil
 	go src.GetSubjectsWithVersions(destChan)
 	destSubjects = <- destChan
+
+	AllowList = holderAllow
+	DisallowList = holderDisallow
 
 	//Must perform soft delete before hard delete
 	for subject, versions := range destSubjects {

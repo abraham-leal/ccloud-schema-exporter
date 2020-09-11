@@ -74,7 +74,7 @@ Usage of ./ccloud-schema-exporter:
   -batchExport
     	Perform a one-time export of all schemas
   -deleteAllFromDestination
-    	Setting this will run a delete on all schemas written to the destination registry
+    	Setting this will run a delete on all schemas written to the destination registry. No respect for allow/disallow lists.
   -dest-sr-key string
     	API KEY for the Destination Schema Registry Cluster
   -dest-sr-secret string
