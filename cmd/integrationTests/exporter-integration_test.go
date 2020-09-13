@@ -472,13 +472,13 @@ func commonSyncTest () bool {
 
 	startAsyncRoutine()
 	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-	resultInitial :=  testInitialSync(1)
+	resultInitial :=  testInitialSync(2)
 	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-	resultRegistration :=  testRegistrationSync(1)
+	resultRegistration :=  testRegistrationSync(2)
 	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-	resultSoftDelete :=  testSoftDelete(1)
+	resultSoftDelete :=  testSoftDelete(2)
 	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-	resultHardDelete :=  testHardDeleteSync(3)
+	resultHardDelete :=  testHardDeleteSync(6)
 	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	return resultInitial && resultRegistration && resultSoftDelete && resultHardDelete
