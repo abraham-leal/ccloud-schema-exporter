@@ -160,7 +160,7 @@ func TestSyncMode(t *testing.T) {
 	srcIDs := make(map[int64]map[string]int64)
 	dstIDs := make(map[int64]map[string]int64)
 
-	newRegister := client.SchemaRecord{
+	newRegisterKey := client.SchemaRecord{
 		Subject: testingSubjectKey,
 		Schema:  newSchema,
 		SType:   "AVRO",
@@ -168,8 +168,19 @@ func TestSyncMode(t *testing.T) {
 		Id:      100007,
 	}
 
-	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(newRegister.Schema,
-		newRegister.Subject,newRegister.Id,newRegister.Version,newRegister.SType)
+	newRegisterValue := client.SchemaRecord{
+		Subject: testingSubjectValue,
+		Schema:  newSchema,
+		SType:   "AVRO",
+		Version: 4,
+		Id:      100007,
+	}
+
+
+	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(newRegisterKey.Schema,
+		newRegisterKey.Subject,newRegisterKey.Id,newRegisterKey.Version,newRegisterKey.SType)
+	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(newRegisterValue.Schema,
+		newRegisterValue.Subject,newRegisterValue.Id,newRegisterValue.Version,newRegisterValue.SType)
 	time.Sleep(time.Duration(11) * time.Second) // Give time for sync
 
 	go testClientSrc.GetAllIDs(aChan)
@@ -473,7 +484,6 @@ func commonSyncTest (lenOfDestSubjects int, lenOfDestIDs int ) bool {
 	startAsyncRoutine()
 	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
 	resultInitial :=  testInitialSync(lenOfDestSubjects)
-	log.Printf("%v", resultInitial)
 	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
 	resultRegistration :=  testRegistrationSync(lenOfDestSubjects)
 	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
