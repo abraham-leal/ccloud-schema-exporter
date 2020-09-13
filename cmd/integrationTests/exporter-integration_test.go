@@ -151,7 +151,7 @@ func TestSyncMode(t *testing.T) {
 	setImportMode()
 	setupSource()
 
-	assert.True(t, commonSyncTest())
+	assert.True(t, commonSyncTest(2,6))
 
 	log.Println("Testing hard delete sync for whole ID")
 
@@ -219,7 +219,7 @@ func TestSyncMode(t *testing.T) {
 	}
 	client.DisallowList = nil
 
-	assert.True(t, commonSyncTest())
+	assert.True(t, commonSyncTest(1,3))
 	killAsyncRoutine()
 	cleanup()
 
@@ -232,7 +232,7 @@ func TestSyncMode(t *testing.T) {
 		testingSubjectValue: true,
 	}
 
-	assert.True(t, commonSyncTest())
+	assert.True(t, commonSyncTest(1,3))
 	killAsyncRoutine()
 	cleanup()
 
@@ -468,17 +468,18 @@ func testLocalCopy (expectedFilesToWrite int) bool {
 	return (len(files2) == expectedFilesToWrite) && (len(files) == expectedFilesToWrite)
 }
 
-func commonSyncTest () bool {
+func commonSyncTest (lenOfDestSubjects int, lenOfDestIDs int ) bool {
 
 	startAsyncRoutine()
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-	resultInitial :=  testInitialSync(2)
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-	resultRegistration :=  testRegistrationSync(2)
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-	resultSoftDelete :=  testSoftDelete(2)
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-	resultHardDelete :=  testHardDeleteSync(6)
+	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
+	resultInitial :=  testInitialSync(lenOfDestSubjects)
+	log.Printf("%v", resultInitial)
+	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
+	resultRegistration :=  testRegistrationSync(lenOfDestSubjects)
+	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
+	resultSoftDelete :=  testSoftDelete(lenOfDestSubjects)
+	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
+	resultHardDelete :=  testHardDeleteSync(lenOfDestIDs)
 	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	return resultInitial && resultRegistration && resultSoftDelete && resultHardDelete
