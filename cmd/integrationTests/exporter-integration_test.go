@@ -151,17 +151,7 @@ func TestSyncMode(t *testing.T) {
 	setImportMode()
 	setupSource()
 
-	startAsyncRoutine()
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testInitialSync(2))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-	assert.True(t, testRegistrationSync(2))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-	assert.True(t, testSoftDelete(2))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-	assert.True(t, testHardDeleteSync(6))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+	assert.True(t, commonSyncTest(2,6))
 
 	log.Println("Testing hard delete sync for whole ID")
 
@@ -170,7 +160,7 @@ func TestSyncMode(t *testing.T) {
 	srcIDs := make(map[int64]map[string]int64)
 	dstIDs := make(map[int64]map[string]int64)
 
-	newRegister := client.SchemaRecord{
+	newRegisterKey := client.SchemaRecord{
 		Subject: testingSubjectKey,
 		Schema:  newSchema,
 		SType:   "AVRO",
@@ -178,8 +168,19 @@ func TestSyncMode(t *testing.T) {
 		Id:      100007,
 	}
 
-	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(newRegister.Schema,
-		newRegister.Subject,newRegister.Id,newRegister.Version,newRegister.SType)
+	newRegisterValue := client.SchemaRecord{
+		Subject: testingSubjectValue,
+		Schema:  newSchema,
+		SType:   "AVRO",
+		Version: 4,
+		Id:      100007,
+	}
+
+
+	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(newRegisterKey.Schema,
+		newRegisterKey.Subject,newRegisterKey.Id,newRegisterKey.Version,newRegisterKey.SType)
+	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(newRegisterValue.Schema,
+		newRegisterValue.Subject,newRegisterValue.Id,newRegisterValue.Version,newRegisterValue.SType)
 	time.Sleep(time.Duration(11) * time.Second) // Give time for sync
 
 	go testClientSrc.GetAllIDs(aChan)
@@ -229,23 +230,8 @@ func TestSyncMode(t *testing.T) {
 	}
 	client.DisallowList = nil
 
-	startAsyncRoutine()
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testInitialSync(1))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testRegistrationSync(1))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testSoftDelete(1))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testHardDeleteSync(3))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
+	assert.True(t, commonSyncTest(1,3))
 	killAsyncRoutine()
-
 	cleanup()
 
 	log.Println("Test Sync Mode With Allow Lists!")
@@ -257,23 +243,8 @@ func TestSyncMode(t *testing.T) {
 		testingSubjectValue: true,
 	}
 
-	startAsyncRoutine()
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testInitialSync(1))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testRegistrationSync(1))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testSoftDelete(1))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testHardDeleteSync(3))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
+	assert.True(t, commonSyncTest(1,3))
 	killAsyncRoutine()
-
 	cleanup()
 
 }
@@ -506,4 +477,21 @@ func testLocalCopy (expectedFilesToWrite int) bool {
 	files2,_ := ioutil.ReadDir(localAbsPath)
 
 	return (len(files2) == expectedFilesToWrite) && (len(files) == expectedFilesToWrite)
+}
+
+func commonSyncTest (lenOfDestSubjects int, lenOfDestIDs int ) bool {
+
+	startAsyncRoutine()
+	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
+	resultInitial :=  testInitialSync(lenOfDestSubjects)
+	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
+	resultRegistration :=  testRegistrationSync(lenOfDestSubjects)
+	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
+	resultSoftDelete :=  testSoftDelete(lenOfDestSubjects)
+	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
+	resultHardDelete :=  testHardDeleteSync(lenOfDestIDs)
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+
+	return resultInitial && resultRegistration && resultSoftDelete && resultHardDelete
+
 }
