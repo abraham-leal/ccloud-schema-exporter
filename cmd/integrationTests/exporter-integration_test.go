@@ -151,17 +151,7 @@ func TestSyncMode(t *testing.T) {
 	setImportMode()
 	setupSource()
 
-	startAsyncRoutine()
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testInitialSync(2))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-	assert.True(t, testRegistrationSync(2))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-	assert.True(t, testSoftDelete(2))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-	assert.True(t, testHardDeleteSync(6))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+	assert.True(t, commonSyncTest())
 
 	log.Println("Testing hard delete sync for whole ID")
 
@@ -229,23 +219,8 @@ func TestSyncMode(t *testing.T) {
 	}
 	client.DisallowList = nil
 
-	startAsyncRoutine()
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testInitialSync(1))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testRegistrationSync(1))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testSoftDelete(1))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testHardDeleteSync(3))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
+	assert.True(t, commonSyncTest())
 	killAsyncRoutine()
-
 	cleanup()
 
 	log.Println("Test Sync Mode With Allow Lists!")
@@ -257,23 +232,8 @@ func TestSyncMode(t *testing.T) {
 		testingSubjectValue: true,
 	}
 
-	startAsyncRoutine()
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testInitialSync(1))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testRegistrationSync(1))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testSoftDelete(1))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	assert.True(t, testHardDeleteSync(3))
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
+	assert.True(t, commonSyncTest())
 	killAsyncRoutine()
-
 	cleanup()
 
 }
@@ -506,4 +466,21 @@ func testLocalCopy (expectedFilesToWrite int) bool {
 	files2,_ := ioutil.ReadDir(localAbsPath)
 
 	return (len(files2) == expectedFilesToWrite) && (len(files) == expectedFilesToWrite)
+}
+
+func commonSyncTest () bool {
+
+	startAsyncRoutine()
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+	resultInitial :=  testInitialSync(1)
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+	resultRegistration :=  testRegistrationSync(1)
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+	resultSoftDelete :=  testSoftDelete(1)
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+	resultHardDelete :=  testHardDeleteSync(3)
+	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
+
+	return resultInitial && resultRegistration && resultSoftDelete && resultHardDelete
+
 }
