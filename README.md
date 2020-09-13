@@ -2,7 +2,7 @@
 
 [![Build](https://travis-ci.com/abraham-leal/ccloud-schema-exporter.svg?branch=master)]() [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=abraham-leal_ccloud-schema-exporter&metric=alert_status)](https://sonarcloud.io/dashboard?id=abraham-leal_ccloud-schema-exporter)
 
-A tool to export all schemas from a Confluent Cloud Schema Registry to another.
+A tool to export schemas from a Confluent Cloud Schema Registry to another.
 This app supports three modes: `batchExport`, `sync`, and `getLocalCopy`.
 
 - `batchExport` will do a one time migration between schema registries, then it will reset the destination registry to `READWRTIE` mode.
@@ -130,7 +130,7 @@ export DST_API_SECRET=XXXX
 It is now possible to filter the subjects which are sync-ed in all modes (`<-sync | -batchExport | -getLocalCopy>`).
 Setting `-allowList` or/and `-disallowList` flags will accept either a comma delimited string or a file containing
 comma delimited entries for subject names (keep in mind these subjects must have their postfixes such as `-value` or 
-`key` to match the topic schema.
+`-key` to match the topic schema.
 These lists will be respected with schema sync, soft delete sync, and hard delete sync options.
 A subject specified in `-disallowList` and `-allowList` will be disallowed by default.
 
@@ -148,4 +148,10 @@ Keep in mind syncing hard deletes does have a performance penalty on the sync.
 Getting the latest snapshot of the state is an expensive operation.
 You can expect about a 2-second increase in sync time.
 
+#### Feature Requests / Issue Reporting
 
+This repo tracks feature requests and issues through Github Issues.
+If you'd like to see something fixed that wasn't caught by testing, or you'd like to see a new feature, please feel free
+to file a Github issue in this repo, I'll review and answer in best effort.
+
+Additionally, if you'd like to contribute a fix/feature, please feel free to open a PR for review.
