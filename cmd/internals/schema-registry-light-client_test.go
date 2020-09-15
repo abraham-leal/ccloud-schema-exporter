@@ -23,6 +23,7 @@ var testClient *SchemaRegistryClient
 var mockSchema = "{\"type\":\"record\",\"name\":\"value_newnew\",\"namespace\":\"com.mycorp.mynamespace\",\"doc\":\"Sample schema to help you get started.\",\"fields\":[{\"name\":\"this\",\"type\":\"int\",\"doc\":\"The int type is a 32-bit signed integer.\"},{\"name\":\"onefield\",\"type\":[\"null\",\"string\"],\"default\":null}]}"
 var testingSubject = "test-key"
 var newSubject = "newSubject-key"
+var SRUrl = "http://localhost:8081"
 
 func TestMainStack(t *testing.T) {
 	setup()
@@ -50,7 +51,8 @@ func setup(){
 	composeEnv.WithCommand([]string{"up","-d"}).Invoke()
 	time.Sleep(time.Duration(18) * time.Second) // give services time to set up
 
-	testClient = NewSchemaRegistryClient("http://localhost:8081","testUser", "testPass", "src")
+
+	testClient = NewSchemaRegistryClient(SRUrl,"testUser", "testPass", "src")
 
 	//Initial schema
 	setImportMode()
@@ -68,7 +70,7 @@ func TIsReachable (t *testing.T) {
 }
 
 func TSetCompat (t *testing.T) {
-	endpoint := fmt.Sprintf("%s/config", "http://localhost:8081")
+	endpoint := fmt.Sprintf("%s/config", SRUrl)
 	req := GetNewRequest("GET", endpoint, "testUser", "testPass", nil)
 	// Test Set READWRITE
 	testClient.SetGlobalCompatibility(FULL)
@@ -92,7 +94,7 @@ func TIsCompatReady(t *testing.T) {
 }
 
 func TSetMode (t *testing.T) {
-	endpoint := fmt.Sprintf("%s/mode", "http://localhost:8081")
+	endpoint := fmt.Sprintf("%s/mode", SRUrl)
 	req := GetNewRequest("GET", endpoint, "testUser", "testPass", nil)
 	// Test Set READWRITE
 	testClient.SetMode(READWRITE)
@@ -328,6 +330,7 @@ func performQuery (req *http.Request) map[string]string {
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Println(err.Error())
+		return nil
 	}
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {

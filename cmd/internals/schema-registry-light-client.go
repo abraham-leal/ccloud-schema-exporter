@@ -152,27 +152,9 @@ func (src *SchemaRegistryClient) GetVersions(subject string, chanX chan <- Subje
 }
 
 func (src *SchemaRegistryClient) IsCompatReady () bool {
-	endpoint := fmt.Sprintf("%s/config",src.SRUrl)
-	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
-
-	res, err := httpClient.Do(req)
-	if err != nil {
-		log.Printf(err.Error())
+	response, ok  :=  handleEndpointQuery("config", src)
+	if !ok {
 		return false
-	}
-	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
-
-	response := map[string]string{}
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.Printf(err.Error())
-		return false
-	}
-
-	err = json.Unmarshal(body,&response)
-	if err != nil {
-		log.Printf(err.Error())
 	}
 
 	if response["compatibilityLevel"] == NONE.String() {
@@ -185,14 +167,14 @@ func (src *SchemaRegistryClient) IsCompatReady () bool {
 func (src *SchemaRegistryClient) SetGlobalCompatibility(comptToSet Compatibility) bool{
 	endpoint := fmt.Sprintf("%s/config",src.SRUrl)
 
-	mode := CompatRecord{Compatibility: comptToSet.String()}
-	modeToSend, err := json.Marshal(mode)
+	compat := CompatRecord{Compatibility: comptToSet.String()}
+	toSend, err := json.Marshal(compat)
 	if err != nil {
 		log.Printf(err.Error())
 		return false
 	}
 
-	req := GetNewRequest("PUT", endpoint, src.SRApiKey, src.SRApiSecret,bytes.NewReader(modeToSend))
+	req := GetNewRequest("PUT", endpoint, src.SRApiKey, src.SRApiSecret,bytes.NewReader(toSend))
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -208,27 +190,8 @@ func (src *SchemaRegistryClient) SetGlobalCompatibility(comptToSet Compatibility
 }
 
 func (src *SchemaRegistryClient) IsImportModeReady () bool {
-	endpoint := fmt.Sprintf("%s/mode",src.SRUrl)
-	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
-
-	res, err := httpClient.Do(req)
-	if err != nil {
-		log.Printf(err.Error())
-		return false
-	}
-	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
-
-	response := map[string]string{}
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.Printf(err.Error())
-		return false
-	}
-
-	err = json.Unmarshal(body,&response)
-	if err != nil {
-		log.Printf(err.Error())
+	response, ok  :=  handleEndpointQuery("mode", src)
+	if !ok {
 		return false
 	}
 
@@ -508,4 +471,30 @@ func filterListedSubjectsVersions (response []SubjectVersion) []SubjectVersion {
 	}
 
 	return subjectVersionSlice
+}
+
+func handleEndpointQuery (end string, src *SchemaRegistryClient) (map[string]string, bool) {
+	endpoint := fmt.Sprintf("%s/%s",src.SRUrl, end)
+	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
+
+	res, err := httpClient.Do(req)
+	if err != nil {
+		log.Printf(err.Error())
+		return nil, false
+	}
+	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
+
+	response := map[string]string{}
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Printf(err.Error())
+		return nil, false
+	}
+
+	err = json.Unmarshal(body,&response)
+	if err != nil {
+		log.Printf(err.Error())
+	}
+	return response, true
 }
