@@ -112,7 +112,6 @@ func TestExportMode(t *testing.T) {
 func TestLocalMode(t *testing.T) {
 	log.Println("Test Local Mode!")
 
-	setImportMode()
 	setupSource()
 
 	client.DisallowList = nil
@@ -144,7 +143,7 @@ func TestLocalMode(t *testing.T) {
 func TestSyncMode(t *testing.T) {
 	log.Println("Test Sync Mode!")
 
-	client.TestHarnessRun = false
+	client.CancelRun = false
 	client.AllowList = nil
 	client.DisallowList = nil
 
@@ -222,7 +221,7 @@ func TestSyncMode(t *testing.T) {
 	cleanup()
 
 	log.Println("Test Sync Mode With Allow Lists!")
-	client.TestHarnessRun = false
+	client.CancelRun = false
 	setupSource()
 
 	client.AllowList = map[string]bool{
@@ -235,7 +234,7 @@ func TestSyncMode(t *testing.T) {
 	cleanup()
 
 	log.Println("Test Sync Mode With Allow Lists!")
-	client.TestHarnessRun = false
+	client.CancelRun = false
 	setupSource()
 
 	client.AllowList = nil
@@ -261,7 +260,7 @@ func startAsyncRoutine () {
 
 func killAsyncRoutine () {
 	log.Println("Killing sync goroutine")
-	client.TestHarnessRun = true
+	client.CancelRun = true
 	time.Sleep(time.Duration(3) * time.Second) // Give thread time to die
 }
 
@@ -332,14 +331,14 @@ func setupSource () {
 
 func setImportMode () {
 	if !testClientDst.IsImportModeReady() {
-		err := testClientDst.SetMode("IMPORT")
+		err := testClientDst.SetMode(client.IMPORT)
 		if err == false {
 			log.Fatalln("Could not set destination registry to IMPORT ModeRecord.")
 		}
 	}
 
 	if !testClientSrc.IsImportModeReady() {
-		err := testClientSrc.SetMode("IMPORT")
+		err := testClientSrc.SetMode(client.IMPORT)
 		if err == false {
 			log.Fatalln("Could not set source registry to IMPORT ModeRecord.")
 		}
@@ -454,17 +453,18 @@ func testHardDeleteSync (lenOfDestIDs int) bool {
 func testLocalCopy (expectedFilesToWrite int) bool {
 
 	currentPath, _ := os.Getwd()
+	currentPath = filepath.Clean(currentPath)
 
 	// Test Relative Paths
-	err := os.Mkdir(filepath.Dir(currentPath)+localRelativePath, 0755)
+	err := os.Mkdir(currentPath+localRelativePath, 0755)
 	if err != nil {
 		panic(err)
 	}
 
-	defer os.RemoveAll(filepath.Dir(currentPath)+localRelativePath)
-	client.WriteToFS(testClientSrc, "testingLocalBackupRelativePath")
+	defer os.RemoveAll(currentPath+localRelativePath)
+	client.WriteToFS(testClientSrc, "testingLocalBackupRelativePath", currentPath)
 
-	files, err2 := ioutil.ReadDir(filepath.Dir(currentPath)+localRelativePath)
+	files, err2 := ioutil.ReadDir(currentPath+localRelativePath)
 	if err2 != nil {
 		panic(err2)
 	}
@@ -472,7 +472,7 @@ func testLocalCopy (expectedFilesToWrite int) bool {
 	// Test Absolute Paths
 	_ = os.Mkdir(localAbsPath, 0755)
 	defer os.RemoveAll(localAbsPath)
-	client.WriteToFS(testClientSrc, localAbsPath)
+	client.WriteToFS(testClientSrc, localAbsPath, currentPath)
 
 	files2,_ := ioutil.ReadDir(localAbsPath)
 

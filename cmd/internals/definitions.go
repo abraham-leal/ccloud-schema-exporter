@@ -8,6 +8,7 @@ package client
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
 	"unicode"
 )
@@ -18,6 +19,13 @@ type SchemaRegistryClient struct {
 	SRApiSecret  string
 	InMemSchemas map[string][]int64
 	InMemIDs	 map[int64]map[string]int64
+}
+
+type CustomDestination interface {
+	SetUp() (bool, error)
+	RegisterSchema() (bool, error)
+	DeleteSchema() (bool, error)
+	TearDown() (bool, error)
 }
 
 type SchemaRecord struct {
@@ -55,6 +63,10 @@ type ModeRecord struct {
 	Mode string 	`json:"mode"`
 }
 
+type CompatRecord struct {
+	Compatibility string 	`json:"compatibility"`
+}
+
 type SubjectWithVersions struct {
 	Subject string
 	Versions []int64
@@ -72,9 +84,10 @@ func (i *StringArrayFlag) String() string {
 }
 
 func (i *StringArrayFlag) Set(value string) error {
+	currentPath, _ := os.Getwd()
 
 	if strings.LastIndexAny(value,"/.") != -1 {
-		path := CheckPath(value)
+		path := CheckPath(value, currentPath)
 		f , err := ioutil.ReadFile(path)
 		if err != nil {
 			panic(err)

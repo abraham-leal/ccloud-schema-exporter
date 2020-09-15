@@ -52,11 +52,10 @@ func (src *SchemaRegistryClient) IsReachable() bool {
 
 	res, err := httpClient.Do(req)
 	if err != nil {
-		log.Fatalln(err.Error())
+		return false
 	}
 
 	if res.StatusCode == 200 {return true} else {return false}
-
 }
 
 func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[string][]int64) {
@@ -93,15 +92,22 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[strin
 	// Start async fetching
 
 	var aGroup sync.WaitGroup
-	aChan := make(chan SubjectWithVersions, 10000)
+	aChan := make(chan SubjectWithVersions)
 
 	for _, s := range response {
 		aGroup.Add(1)
+		/*
+			Rate limit: In order not to saturate the SR instances, we limit the rate at which we send schema discovery requests.
+			The idea being that if one SR instance can handle the load, a cluster should be able to handle it
+			even more easily. During testing, it was found that 2ms is an ideal delay for best sync performance.
+		*/
+		time.Sleep(time.Duration(2) * time.Millisecond)
 		go src.GetVersions(s, aChan, &aGroup)
 	}
-
-	aGroup.Wait()
-	close(aChan)
+	go func() {
+		aGroup.Wait()
+		close(aChan)
+	}()
 
 	//Collect SubjectWithVersions
 	for item := range aChan {
@@ -114,11 +120,13 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[strin
 
 func (src *SchemaRegistryClient) GetVersions(subject string, chanX chan <- SubjectWithVersions, wg *sync.WaitGroup) {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl,subject)
+	defer wg.Done()
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
+		return
 	}
 	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
@@ -141,17 +149,16 @@ func (src *SchemaRegistryClient) GetVersions(subject string, chanX chan <- Subje
 
 	// Send back to retrieving thread
 	chanX <- pkgSbj
-	wg.Done()
-
 }
 
-func (src *SchemaRegistryClient) IsImportModeReady () bool {
-	endpoint := fmt.Sprintf("%s/mode",src.SRUrl)
+func (src *SchemaRegistryClient) IsCompatReady () bool {
+	endpoint := fmt.Sprintf("%s/config",src.SRUrl)
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
+		return false
 	}
 	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
@@ -168,20 +175,21 @@ func (src *SchemaRegistryClient) IsImportModeReady () bool {
 		log.Printf(err.Error())
 	}
 
-	if response["mode"] == "IMPORT" {
+	if response["compatibilityLevel"] == NONE.String() {
 		return true
 	} else {
 		return false
 	}
 }
 
-func (src *SchemaRegistryClient) SetMode(modeToSet string) bool{
-	endpoint := fmt.Sprintf("%s/mode",src.SRUrl)
+func (src *SchemaRegistryClient) SetGlobalCompatibility(comptToSet Compatibility) bool{
+	endpoint := fmt.Sprintf("%s/config",src.SRUrl)
 
-	mode := ModeRecord{Mode: modeToSet}
+	mode := CompatRecord{Compatibility: comptToSet.String()}
 	modeToSend, err := json.Marshal(mode)
 	if err != nil {
 		log.Printf(err.Error())
+		return false
 	}
 
 	req := GetNewRequest("PUT", endpoint, src.SRApiKey, src.SRApiSecret,bytes.NewReader(modeToSend))
@@ -189,10 +197,68 @@ func (src *SchemaRegistryClient) SetMode(modeToSet string) bool{
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
+		return false
 	}
 	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
-	if (res.StatusCode == 200) {
+	if res.StatusCode == 200 {
+		return true
+	} else {return false}
+
+}
+
+func (src *SchemaRegistryClient) IsImportModeReady () bool {
+	endpoint := fmt.Sprintf("%s/mode",src.SRUrl)
+	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
+
+	res, err := httpClient.Do(req)
+	if err != nil {
+		log.Printf(err.Error())
+		return false
+	}
+	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
+
+	response := map[string]string{}
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Printf(err.Error())
+		return false
+	}
+
+	err = json.Unmarshal(body,&response)
+	if err != nil {
+		log.Printf(err.Error())
+		return false
+	}
+
+	if response["mode"] == IMPORT.String() {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (src *SchemaRegistryClient) SetMode(modeToSet Mode) bool{
+	endpoint := fmt.Sprintf("%s/mode",src.SRUrl)
+
+	mode := ModeRecord{Mode: modeToSet.String()}
+	modeToSend, err := json.Marshal(mode)
+	if err != nil {
+		log.Printf(err.Error())
+		return false
+	}
+
+	req := GetNewRequest("PUT", endpoint, src.SRApiKey, src.SRApiSecret,bytes.NewReader(modeToSend))
+
+	res, err := httpClient.Do(req)
+	if err != nil {
+		log.Printf(err.Error())
+		return false
+	}
+	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
+
+	if res.StatusCode == 200 {
 		return true
 	} else {return false}
 
@@ -205,6 +271,8 @@ func (src *SchemaRegistryClient) GetSchema (subject string, version int64) Schem
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
+		log.Println("Could not retrieve schema!")
+		return SchemaRecord{}
 	}
 	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
@@ -238,6 +306,8 @@ func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion (schema 
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
+		log.Println("Could not register schema!")
+		return nil
 	}
 	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
@@ -279,6 +349,7 @@ func (src *SchemaRegistryClient) PerformSoftDelete(subject string, version int64
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
+		return false
 	}
 
 	return handleDeletes(res.Body, res.StatusCode, req.Method, endpoint, "Soft", subject, version)
@@ -290,6 +361,7 @@ func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int64
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
+		return false
 	}
 
 	return handleDeletes(res.Body, res.StatusCode, req.Method, endpoint, "Hard", subject, version)
@@ -299,7 +371,7 @@ func (src *SchemaRegistryClient) GetAllIDs (aChan chan <- map[int64]map[string]i
 	src.InMemIDs = map[int64]map[string]int64{} // Map of ID -> (Map of subject -> Version)
 
 	var aGroup sync.WaitGroup
-	aSubChan := make(chan idSubjectVersion, 10000)
+	aSubChan := make(chan idSubjectVersion)
 	//Generate bounds
 	for i := LowerBound; i <= UpperBound; i++ {
 		aGroup.Add(1)
@@ -311,24 +383,22 @@ func (src *SchemaRegistryClient) GetAllIDs (aChan chan <- map[int64]map[string]i
 		time.Sleep(time.Duration(2) * time.Millisecond)
 		go src.isID(i, aSubChan, &aGroup)
 	}
-	aGroup.Wait()
-	close(aSubChan)
+	go func() {
+		aGroup.Wait()
+		close(aSubChan)
+	}()
 
 	//Collect SubjectWithVersions
 	for item := range aSubChan {
 		src.InMemIDs[item.Id] = item.SubjectAndVersion
 	}
-
 	aChan <- src.InMemIDs
 
 }
 
 func (src *SchemaRegistryClient) isID ( id int64, aChan chan <- idSubjectVersion, wg *sync.WaitGroup) {
 	answer := idSubjectVersion{}
-
-	httpClient := http.Client{
-		Timeout: time.Second * time.Duration(10),
-	}
+	defer wg.Done()
 
 	endpoint := fmt.Sprintf("%s/schemas/ids/%d/versions", src.SRUrl, id)
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
@@ -344,19 +414,18 @@ func (src *SchemaRegistryClient) isID ( id int64, aChan chan <- idSubjectVersion
 	check(err)
 
 	if res.StatusCode == 200 {
-		json.Unmarshal(body, &manyPairs)
+		_ = json.Unmarshal(body, &manyPairs)
 		manyPairs = filterListedSubjectsVersions(manyPairs)
 		for _ , subjectVer := range manyPairs {
 			tempMapOfSubjectVersion[subjectVer.Subject] = subjectVer.Version
 		}
+
 		if len(tempMapOfSubjectVersion) != 0 { // Do not add IDs with empty subject-version references
 			answer.Id = id
 			answer.SubjectAndVersion = tempMapOfSubjectVersion
 			aChan <- answer
 		}
 	}
-
-	defer wg.Done()
 }
 
 func handleDeletes (body io.Reader, statusCode int, method string, endpoint string,

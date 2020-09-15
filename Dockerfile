@@ -6,4 +6,4 @@ RUN CGO_ENABLED=0 GOOS=linux go build ./cmd/ccloud-schema-exporter/ccloud-schema
 FROM scratch
 COPY --from=builder /app/ccloud-schema-exporter /
 ADD cmd/trustedEntities /etc/ssl/certs/
-ENTRYPOINT ["/ccloud-schema-exporter", "-sync", "-syncDeletes", "-syncHardDeletes"]
+ENTRYPOINT ["/ccloud-schema-exporter", "-sync", "-syncDeletes", "-syncHardDeletes", "-no-prompt"]

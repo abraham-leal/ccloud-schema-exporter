@@ -9,13 +9,23 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sync"
+	"syscall"
 )
 
-func WriteToFS (srcClient *SchemaRegistryClient, definedPath string) {
+func WriteToFS (srcClient *SchemaRegistryClient, definedPath string, workingDirectory string) {
+	// Listen for program interruption
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-sigs
+		log.Printf("Received %v signal, quitting non-started schema writes...", sig)
+		CancelRun = true
+	}()
 
-	definedPath = CheckPath(definedPath)
+	definedPath = CheckPath(definedPath, workingDirectory)
 
 	srcChan := make(chan map[string][]int64)
 	go srcClient.GetSubjectsWithVersions(srcChan)
@@ -33,7 +43,11 @@ func WriteToFS (srcClient *SchemaRegistryClient, definedPath string) {
 }
 
 func writeSchema (srcClient *SchemaRegistryClient, pathToWrite string, subject string, version int64, wg *sync.WaitGroup) {
-	rawSchema := srcClient.GetSchema(subject,int64(version))
+	rawSchema := srcClient.GetSchema(subject,version)
+	defer wg.Done()
+	if CancelRun == true {
+		return
+	}
 
 
 	log.Printf("Writing schema: %s with version: %d and ID: %d",
@@ -48,18 +62,16 @@ func writeSchema (srcClient *SchemaRegistryClient, pathToWrite string, subject s
 	_, err = f.WriteString(rawSchema.Schema)
 	check(err)
 	_ = f.Sync()
-
-	wg.Done()
 }
 
-func CheckPath (definedPath string) string {
+func CheckPath (definedPath string, workingDirectory string) string {
 
-	currentPath, _ := os.Getwd()
+	currentPath := filepath.Clean(workingDirectory)
 
 	if definedPath == "" {
+		definedPath = filepath.Join(currentPath, "SchemaRegistryBackup")
 		log.Println("Path not defined, writing to new local folder SchemaRegistryBackup")
-		_ = os.Mkdir("SchemaRegistryBackup", 0755)
-		definedPath = filepath.Join(filepath.Dir(currentPath), "SchemaRegistryBackup")
+		_ = os.Mkdir(definedPath, 0755)
 		return definedPath
 	} else {
 		if filepath.IsAbs(definedPath){
@@ -68,7 +80,7 @@ func CheckPath (definedPath string) string {
 				log.Fatalln("The directory specified does not exist.")
 			}
 		} else {
-			definedPath = filepath.Join(filepath.Dir(currentPath),definedPath)
+			definedPath = filepath.Join(currentPath,definedPath)
 			_, err := os.Stat(definedPath)
 			if os.IsNotExist(err) {
 				log.Println("Path: " + definedPath)

@@ -10,6 +10,7 @@ import (
 	"github.com/abraham-leal/ccloud-schema-exporter/cmd/internals"
 	"log"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -18,12 +19,15 @@ func main() {
 
 	srcClient := client.NewSchemaRegistryClient(client.SrcSRUrl,client.SrcSRKey, client.SrcSRSecret , "src")
 	if (!srcClient.IsReachable()){
-		log.Println("Could not reach source registry. Possible bad credentials?")
-		os.Exit(0)
+		log.Fatalln("Could not reach source registry. Possible bad credentials?")
 	}
 
-	if client.RunMode == "LOCAL" {
-		client.WriteToFS(srcClient, client.PathToWrite)
+	if client.ThisRun == client.LOCAL {
+		workingDir , err := os.Getwd()
+		if err != nil {
+			log.Fatalln("Could not get execution path. Possibly a permissions issue.")
+		}
+		client.WriteToFS(srcClient, client.PathToWrite, workingDir)
 
 		log.Println("-----------------------------------------------")
 		log.Println("All Done! Thanks for using ccloud-schema-exporter!")
@@ -42,13 +46,13 @@ func main() {
 	destSubjects := <- destChan
 	close(destChan)
 
-	if (len(destSubjects) != 0 && client.RunMode != "SYNC") {
-		log.Println("You have existing subjects registered in this registry, exporter cannot write schemas when " +
+	if len(destSubjects) != 0 && client.ThisRun != client.SYNC && !client.NoPrompt {
+		log.Println("You have existing subjects registered in the destination registry, exporter cannot write schemas when " +
 			"previous schemas exist in batch mode.")
 		os.Exit(0)
 	}
 
-	if (!destClient.IsImportModeReady()){
+	if !destClient.IsImportModeReady() {
 
 		fmt.Println("Destination Schema Registry is not set to IMPORT mode!")
 		fmt.Println("------------------------------------------------------")
@@ -61,29 +65,55 @@ func main() {
 			log.Fatal(err)
 		}
 
-		if (text == "Y") {
-			err := destClient.SetMode("IMPORT")
+		if strings.EqualFold(text,"Y") {
+			err := destClient.SetMode(client.IMPORT)
 			if err == false {
-				log.Println("Could not set destination registry to IMPORT ModeRecord.")
+				log.Println("Could not set destination registry to IMPORT Mode.")
 				os.Exit(0)
 			}
 		} else {
-			log.Println("Cannot export schemas if destination is not set to IMPORT ModeRecord.")
+			log.Println("Cannot export schemas if destination is not set to IMPORT Mode")
 			os.Exit(0)
 		}
 	}
 
-	if (client.RunMode == "SYNC") {
+	if !destClient.IsCompatReady() && !client.NoPrompt {
+
+		fmt.Println("Destination Schema Registry is not set to NONE global compatibility level!")
+		fmt.Println("We assume the source to be maintaining correct compatibility between registrations, per subject compatibility changes are not supported.")
+		fmt.Println("------------------------------------------------------")
+		fmt.Println("Set to NONE? (Y/n)")
+
+		var text string
+
+		_, err := fmt.Scanln(&text)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if strings.EqualFold(text,"Y") {
+			err := destClient.SetGlobalCompatibility(client.NONE)
+			if err == false {
+				log.Fatalln("Could not set destination registry to Global NONE Compatibility Level.")
+			}
+		} else {
+			log.Println("Continuing without NONE Global Compatibility Level. Note this might arise some failures in registration of some schemas.")
+		}
+	}
+
+	if client.ThisRun == client.SYNC {
 		client.Sync(srcClient,destClient)
 	}
-	if (client.RunMode == "BATCH") {
+	if client.ThisRun == client.BATCH {
 		client.BatchExport(srcClient,destClient)
 	}
 
 	log.Println("-----------------------------------------------")
 
-	log.Println("Resetting target to READWRITE")
-	destClient.SetMode("READWRITE")
+	if client.ThisRun == client.BATCH {
+		log.Println("Resetting target to READWRITE")
+		destClient.SetMode(client.READWRITE)
+	}
 
 	log.Println("All Done! Thanks for using ccloud-schema-exporter!")
 

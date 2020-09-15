@@ -45,7 +45,7 @@ docker run \
 
 A sample docker-compose is also provided at the root of this directory.
 
-The docker image handles `-sync -syncDeletes -syncHardDeletes` continuous sync. For a one time export, it is recommended to use a release binary.
+The docker image handles `-sync -syncDeletes -syncHardDeletes -no-prompt` continuous sync. For a one time export, it is recommended to use a release binary.
 
 If you'd like to pass custom flags, it is recommended to override the entry-point such as with `--entrypoint` with `/ccloud-schema-exporter` at the beginning of the override.
 
@@ -84,7 +84,7 @@ Usage of ./ccloud-schema-exporter:
   -disallowList value
     	A comma delimited list of schema subjects to disallow. It also accepts paths to a file containing a list of subjects.
   -getLocalCopy
-    	Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path
+    	Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path of the binaries.
   -getLocalCopyPath string
     	Optional custom path for local copy. This must be an existing directory structure.
   -lowerBound int
@@ -138,7 +138,7 @@ NOTE: Lists aren't respected with the utility `-deleteAllFromDestination`
 
 #### A Note on syncing hard deletions
 
-Confluent's Schema Registry does not provide a good way to discover the full space of IDs registered.
+Confluent Schema Registry does not provide a good way to discover the full space of IDs registered.
 Due to this, we do inefficient discovery of schema IDs. 
 This means we have to assume Schema Registry IDs in the source and destiny SRs are within a range. 
 By default, this range is 100,000 to 101,000. (The default start and limit in Confluent Cloud)
@@ -147,6 +147,20 @@ This range is tunable by setting `-lowerBound` and `-upperBound` together with e
 Keep in mind syncing hard deletes does have a performance penalty on the sync. 
 Getting the latest snapshot of the state is an expensive operation.
 You can expect about a 2-second increase in sync time.
+
+#### Non-Interactive Run
+
+`ccloud-schema-exporter` is meant to be ran in a non-interactive way. 
+However, it does include some checks to assure things go smoothly in the replication flow.
+You can disable these checks by setting the configuration `-no-prompt`.
+By default, the docker image has this in its entry point.
+
+There are two checks made:
+- The destination schema registry is in `IMPORT` mode. This is a requirement, otherwise the replication won't work.
+- The destination schema registry is in `NONE` global compatibility mode.
+This is not a requirement, but suggested since per-subject compatibility rules cannot be determined per version.
+Not setting this may result in some versions not being able to be registered since they do not adhere to the global compatibility mode.
+(The default compatibility in Confluent Cloud is `BACKWARD`).
 
 #### Feature Requests / Issue Reporting
 
