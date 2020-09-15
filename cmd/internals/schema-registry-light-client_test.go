@@ -49,7 +49,7 @@ func TestMainStack(t *testing.T) {
 func setup(){
 	composeEnv = testcontainers.NewLocalDockerCompose([]string{"../integrationTests/docker-compose-internal.yml"},"internals")
 	composeEnv.WithCommand([]string{"up","-d"}).Invoke()
-	time.Sleep(time.Duration(18) * time.Second) // give services time to set up
+	time.Sleep(time.Duration(25) * time.Second) // give services time to set up
 
 
 	testClient = NewSchemaRegistryClient(SRUrl,"testUser", "testPass", "src")
