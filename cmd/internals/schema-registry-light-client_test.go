@@ -276,7 +276,7 @@ func TFilterListedSubjectsVersions (t *testing.T) {
 	}
 
 	// Expect hello to be disallowed, expect ImASubject to not be included regardless
-	expected = []SubjectVersion{{Subject: newSubject, Version: 1},{Subject: testingSubject, Version: 1}}
+	expected = []SubjectVersion{{Subject: testingSubject, Version: 1},{Subject: newSubject, Version: 1}}
 	assert.Equal(t, expected, filterListedSubjectsVersions(mySubjects))
 
 	AllowList = nil
