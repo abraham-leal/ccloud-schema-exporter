@@ -102,10 +102,7 @@ func RunCustomDestinationBatch (srcClient *SchemaRegistryClient, customDest Cust
 			log.Printf("Registering schema: %s with version: %d and ID: %d and Type: %s",
 				schema.Subject, schema.Version, schema.Id, schema.SType)
 			err := customDest.RegisterSchema(schema)
-			if err != nil {
-				log.Println("Could not register schema to destination:")
-				log.Println(err)
-			}
+			checkCouldNotRegister(err)
 		}
 	}
 }
@@ -121,10 +118,7 @@ func customSync (diff map[string][]int64, srcClient *SchemaRegistryClient, custo
 					" and ID: " + strconv.FormatInt(schema.Id, 10) +
 					" and Type: " + schema.SType)
 				err := customDest.RegisterSchema(schema)
-				if err != nil {
-					log.Println("Could not register schema to destination:")
-					log.Println(err)
-				}
+				checkCouldNotRegister(err)
 			}
 		}
 	}
@@ -138,10 +132,7 @@ func customSyncDeletes (destSubjects map[string][]int64, srcSubjects map[string]
 			for _, v := range versions {
 				schema := srcClient.GetSchema(subject, v)
 				err := customDest.DeleteSchema(schema)
-				if err != nil {
-					log.Println("Could not register schema to destination:")
-					log.Println(err)
-				}
+				checkCouldNotRegister(err)
 			}
 		}
 	}
@@ -205,4 +196,11 @@ func (cd SampleCustomDestination) TearDown () error {
 func removeFromSlice(s []int64, i int) []int64 {
 	s[i] = s[len(s)-1]
 	return s[:len(s)-1]
+}
+
+func checkCouldNotRegister (err error) {
+	if err != nil {
+		log.Println("Could not register schema to destination:")
+		log.Println(err)
+	}
 }
