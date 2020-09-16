@@ -20,6 +20,7 @@ func GetFlags() {
 	flag.StringVar(&DestSRUrl, "dest-sr-url", "", "Url to the Destination Schema Registry Cluster")
 	flag.StringVar(&DestSRKey, "dest-sr-key", "", "API KEY for the Destination Schema Registry Cluster")
 	flag.StringVar(&DestSRSecret, "dest-sr-secret", "", "API SECRET for the Destination Schema Registry Cluster")
+	flag.StringVar(&CustomDestinationName, "customDestination", "", "Name of the implementation to be used as a destination (same as mapping)")
 	flag.IntVar(&HttpCallTimeout, "timeout", 60, "Timeout, in seconds, to use for all REST calls with the Schema Registries")
 	flag.IntVar(&ScrapeInterval, "scrapeInterval", 60, "Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds")
 	flag.StringVar(&PathToWrite, "getLocalCopyPath", "",
@@ -37,6 +38,8 @@ func GetFlags() {
 	syncDeletesFlag := flag.Bool("syncDeletes", false, "Setting this will sync soft deletes from the source cluster to the destination")
 	syncHardDeletesFlag := flag.Bool("syncHardDeletes", false, "Setting this will sync hard deletes from the source cluster to the destination")
 	noPromptFlag := flag.Bool("no-prompt", false, "Set this flag to avoid checks while running. Assure you have the destination SR to correct Mode and Compatibility.")
+
+
 
 	flag.Parse()
 

@@ -13,6 +13,13 @@ import (
 	"strings"
 )
 
+var factory = map[string]client.CustomDestination{
+	"sampleCustomDestination": client.NewSampleCustomDestination(),
+	// Add here a mapping of name -> factory/empty struct for reference at runtime
+	// See sample above for the built-in sample custom destination that is within the client package
+}
+
+
 func main() {
 
 	client.GetFlags()
@@ -20,6 +27,20 @@ func main() {
 	srcClient := client.NewSchemaRegistryClient(client.SrcSRUrl,client.SrcSRKey, client.SrcSRSecret , "src")
 	if (!srcClient.IsReachable()){
 		log.Fatalln("Could not reach source registry. Possible bad credentials?")
+	}
+
+	if client.CustomDestinationName != "" {
+
+		if client.ThisRun == client.BATCH {
+			client.RunCustomDestinationBatch(srcClient, factory[client.CustomDestinationName])
+		}
+		if client.ThisRun == client.SYNC {
+			client.RunCustomDestinationSync(srcClient, factory[client.CustomDestinationName])
+		}
+		log.Println("-----------------------------------------------")
+		log.Println("All Done! Thanks for using ccloud-schema-exporter!")
+
+		os.Exit(0)
 	}
 
 	if client.ThisRun == client.LOCAL {

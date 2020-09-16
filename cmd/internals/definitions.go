@@ -21,11 +21,24 @@ type SchemaRegistryClient struct {
 	InMemIDs	 map[int64]map[string]int64
 }
 
+/*
+Any struct that implements this interface is able to run an instance of sync and batch exporting.
+ */
 type CustomDestination interface {
-	SetUp() (bool, error)
-	RegisterSchema() (bool, error)
-	DeleteSchema() (bool, error)
-	TearDown() (bool, error)
+	// Perform any set-up behavior before start of sync/batch export
+	SetUp() error
+	// An implementation should handle the registration of a schema in the destination.
+	// The SchemaRecord struct provides all details needed for registration.
+	RegisterSchema(record SchemaRecord) error
+	// An implementation should handle the deletion of a schema in the destination.
+	// The SchemaRecord struct provides all details needed for deletion.
+	DeleteSchema(record SchemaRecord) error
+	// An implementation should be able to send exactly one map describing the state of the destination
+	// This map should be minimal. Describing only the Subject and Versions that already exist.
+	// We assume this operation to be best done asynchronously, hence the channel.
+	GetDestinationState(channel chan <- map[string][]int64) error
+	// Perform any tear-down behavior before start of sync/batch export
+	TearDown() error
 }
 
 type SchemaRecord struct {

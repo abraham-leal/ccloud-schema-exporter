@@ -20,6 +20,7 @@ var SrcSRSecret string
 var DestSRUrl string
 var DestSRKey string
 var DestSRSecret string
+var CustomDestinationName string
 var NoPrompt bool
 var SyncDeletes bool
 var SyncHardDeletes bool

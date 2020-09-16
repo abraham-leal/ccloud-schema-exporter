@@ -73,6 +73,8 @@ Usage of ./ccloud-schema-exporter:
     	A comma delimited list of schema subjects to allow. It also accepts paths to a file containing a list of subjects.
   -batchExport
     	Perform a one-time export of all schemas
+  -customDestination string
+    	Name of the implementation to be used as a destination (same as mapping)
   -deleteAllFromDestination
     	Setting this will run a delete on all schemas written to the destination registry. No respect for allow/disallow lists.
   -dest-sr-key string
@@ -113,7 +115,6 @@ Usage of ./ccloud-schema-exporter:
     	Print the usage of this tool
   -version
     	Print the current version and exit
-
 
 ````
 
@@ -164,6 +165,66 @@ There are two checks made:
 This is not a requirement, but suggested since per-subject compatibility rules cannot be determined per version.
 Not setting this may result in some versions not being able to be registered since they do not adhere to the global compatibility mode.
 (The default compatibility in Confluent Cloud is `BACKWARD`).
+
+#### Custom Destinations / Extendability
+
+`ccloud-schema-exporter` supports custom implementations of destinations.
+If you'd like to leverage the already built back-end, all you have to do is implement the `CustomDestination` interface.
+A copy of the interface definition is below for convenience:
+
+````
+type CustomDestination interface {
+	// Perform any set-up behavior before start of sync/batch export
+	SetUp() error
+	// An implementation should handle the registration of a schema in the destination.
+	// The SchemaRecord struct provides all details needed for registration.
+	RegisterSchema(record SchemaRecord) error
+	// An implementation should handle the deletion of a schema in the destination.
+	// The SchemaRecord struct provides all details needed for deletion.
+	DeleteSchema(record SchemaRecord) error
+	// An implementation should be able to send exactly one map describing the state of the destination
+	// This map should be minimal. Describing only the Subject and Versions that already exist.
+	// We assume this operation to be best done asynchronously, hence the channel.
+	GetDestinationState(channel chan <- map[string][]int64) error
+	// Perform any tear-down behavior before start of sync/batch export
+	TearDown() error
+}
+````
+
+Golang isn't candid on runtime lookup of implementations of interfaces, so in order to make this implementation to the tool you must register it.
+To register your implementation, go into `cmd/ccloud-schema-exporter/ccloud-schema-exporter.go` and modify the following map:
+
+````
+var factory = map[string]client.CustomDestination{
+	"sampleCustomDestination": client.NewSampleCustomDestination(),
+	// Add here a mapping of name -> factory/empty struct for reference at runtime
+	// See sample above for the built-in sample custom destination that is within the client package
+}
+````
+
+You will see this map already has one entry, that is because `ccloud-schema-exporter` comes with a sample implementation of the interface under `cmd/internals/customDestination.go`, check it out!
+Make sure to add your implementation to this map.
+
+Once added, all you have to do is indicate you will want to run with a custom destination with the `-customDestination` flag.
+The value of this flag must be the name you gave it in the factory mapping.
+
+The following options are respected for custom destinations as well:
+
+````
+  -allowList value
+    	A comma delimited list of schema subjects to allow. It also accepts paths to a file containing a list of subjects.
+  -batchExport
+    	Perform a one-time export of all schemas
+  -disallowList value
+    	A comma delimited list of schema subjects to disallow. It also accepts paths to a file containing a list of subjects.
+  -scrapeInterval int
+    	Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds (default 60)
+  -sync
+    	Sync schemas continuously
+  -syncDeletes
+    	Setting this will sync soft deletes from the source cluster to the destination
+````
+
 
 #### Feature Requests / Issue Reporting
 
