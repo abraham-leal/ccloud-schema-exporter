@@ -89,6 +89,8 @@ Usage of ./ccloud-schema-exporter:
     	Optional custom path for local copy. This must be an existing directory structure.
   -lowerBound int
     	Lower SR ID space bound (default 100000)
+  -no-prompt
+    	Set this flag to avoid checks while running. Assure you have the destination SR to correct Mode and Compatibility.
   -scrapeInterval int
     	Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds (default 60)
   -src-sr-key string
@@ -111,6 +113,7 @@ Usage of ./ccloud-schema-exporter:
     	Print the usage of this tool
   -version
     	Print the current version and exit
+
 
 ````
 
