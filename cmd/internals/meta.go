@@ -11,7 +11,7 @@ import (
 
 var HttpCallTimeout int
 var ScrapeInterval int
-var Version = "1.0-SNAPSHOT"
+var Version = "1.0"
 var httpClient http.Client
 
 var SrcSRUrl string
