@@ -277,7 +277,8 @@ func TFilterListedSubjectsVersions (t *testing.T) {
 
 	// Expect hello to be disallowed, expect ImASubject to not be included regardless
 	expected = []SubjectVersion{{Subject: testingSubject, Version: 1},{Subject: newSubject, Version: 1}}
-	assert.Equal(t, expected, filterListedSubjectsVersions(mySubjects))
+	areEqual := compareSlices(expected, filterListedSubjectsVersions(mySubjects))
+	assert.True(t, areEqual)
 
 	AllowList = nil
 	DisallowList = nil
@@ -343,4 +344,28 @@ func performQuery (req *http.Request) map[string]string {
 
 	return response
 
+}
+
+func compareSlices (a, b []SubjectVersion) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	sliceAMap := map[SubjectVersion]bool{}
+	sliceBMap := map[SubjectVersion]bool{}
+
+	for _ , val := range a {
+		sliceAMap[val] = false
+	}
+	for _ , val := range b {
+		sliceBMap[val] = false
+	}
+
+	for val, _ := range sliceAMap {
+		_, exists := sliceBMap[val]
+		if !exists {
+			return false
+		}
+	}
+	return true
 }
