@@ -7,124 +7,365 @@ package client
 
 import (
 	"encoding/json"
-	"github.com/dankinder/httpmock"
+	"fmt"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"html"
+	"github.com/testcontainers/testcontainers-go"
 	"io/ioutil"
+	"log"
+	"net/http"
+	"sync"
 	"testing"
+	"time"
 )
 
-func TestGetSubjectWithVersion(t *testing.T) {
-	registryHandler := &httpmock.MockHandler{}
+var composeEnv *testcontainers.LocalDockerCompose
+var testClient *SchemaRegistryClient
+var mockSchema = "{\"type\":\"record\",\"name\":\"value_newnew\",\"namespace\":\"com.mycorp.mynamespace\",\"doc\":\"Sample schema to help you get started.\",\"fields\":[{\"name\":\"this\",\"type\":\"int\",\"doc\":\"The int type is a 32-bit signed integer.\"},{\"name\":\"onefield\",\"type\":[\"null\",\"string\"],\"default\":null}]}"
+var testingSubject = "test-key"
+var newSubject = "newSubject-key"
+var SRUrl = "http://localhost:8081"
 
-	registryHandler.On("Handle","GET", "/subjects", mock.Anything).Return(
-		httpmock.Response{ Body: []byte(`["testSubject"]`),
-		})
-	registryHandler.On("Handle","GET", "/subjects/testSubject/versions", mock.Anything).Return(
-		httpmock.Response{ Body: []byte(`[1]`),
-		})
+func TestMainStack(t *testing.T) {
+	setup()
+	t.Run("TIsCompatReady", func(t *testing.T) {TIsCompatReady(t)})
+	t.Run("TSetCompat", func(t *testing.T) {TSetCompat(t)})
+	t.Run("TIsReachable", func(t *testing.T) {TIsReachable(t)})
+	t.Run("TSetMode", func(t *testing.T) {TSetMode(t)})
+	t.Run("TIsImportModeReady", func(t *testing.T) {TIsImportModeReady(t)})
+	t.Run("TGetSubjectWithVersions", func(t *testing.T) {TGetSubjectWithVersions(t)})
+	t.Run("TGetVersions", func(t *testing.T) {TGetVersions(t)})
+	t.Run("TGetSchema", func(t *testing.T) {TGetSchema(t)})
+	t.Run("TRegisterSchemaBySubjectAndIDAndVersion", func(t *testing.T) {TRegisterSchemaBySubjectAndIDAndVersion(t)})
+	t.Run("TGetAllIDs", func(t *testing.T) {TGetAllIDs(t)})
+	t.Run("TIsID", func(t *testing.T) {TIsID(t)})
+	t.Run("TFilterListedSubjects", func(t *testing.T) {TFilterListedSubjects(t)})
+	t.Run("TFilterListedSubjectsVersions", func(t *testing.T) {TFilterListedSubjectsVersions(t)})
+	t.Run("TPerformSoftDelete", func(t *testing.T) {TPerformSoftDelete(t)})
+	t.Run("TPerformHardDelete", func(t *testing.T) {TPerformHardDelete(t)})
+	t.Run("TDeleteAllSubjectsPermanently", func(t *testing.T) {TDeleteAllSubjectsPermanently(t)})
+	tearDown()
+}
 
-	server := httpmock.NewServer(registryHandler)
-	defer server.Close()
+func setup(){
+	composeEnv = testcontainers.NewLocalDockerCompose([]string{"../integrationTests/docker-compose-internal.yml"},"internals")
+	composeEnv.WithCommand([]string{"up","-d"}).Invoke()
+	time.Sleep(time.Duration(25) * time.Second) // give services time to set up
 
-	testSClient := NewSchemaRegistryClient(server.URL(), "mockKey", "mockSecret","src")
+
+	testClient = NewSchemaRegistryClient(SRUrl,"testUser", "testPass", "src")
+
+	//Initial schema
+	setImportMode()
+}
+
+func tearDown(){
+	composeEnv.WithCommand([]string{"down","-v"}).Invoke()
+}
+
+func TIsReachable (t *testing.T) {
+	falseTestClient := NewSchemaRegistryClient("http://localhost:8083","testUser", "testPass", "src")
+
+	assert.True(t, testClient.IsReachable())
+	assert.False(t, falseTestClient.IsReachable())
+}
+
+func TSetCompat (t *testing.T) {
+	endpoint := fmt.Sprintf("%s/config", SRUrl)
+	req := GetNewRequest("GET", endpoint, "testUser", "testPass", nil)
+	// Test Set READWRITE
+	testClient.SetGlobalCompatibility(FULL)
+	assert.True(t, performQuery(req)["compatibilityLevel"] == FULL.String())
+	// Test Set IMPORT
+	testClient.SetGlobalCompatibility(BACKWARD)
+	assert.True(t, performQuery(req)["compatibilityLevel"] == BACKWARD.String())
+	// Test Set READWRITE
+	testClient.SetGlobalCompatibility(FORWARD)
+	assert.True(t, performQuery(req)["compatibilityLevel"] == FORWARD.String())
+	// Test Set NONE
+	testClient.SetGlobalCompatibility(NONE)
+	assert.True(t, performQuery(req)["compatibilityLevel"] == NONE.String())
+}
+
+func TIsCompatReady(t *testing.T) {
+	testClient.SetGlobalCompatibility(FULL)
+	assert.False(t, testClient.IsCompatReady())
+	testClient.SetGlobalCompatibility(NONE)
+	assert.True(t, testClient.IsCompatReady())
+}
+
+func TSetMode (t *testing.T) {
+	endpoint := fmt.Sprintf("%s/mode", SRUrl)
+	req := GetNewRequest("GET", endpoint, "testUser", "testPass", nil)
+	// Test Set READWRITE
+	testClient.SetMode(READWRITE)
+	assert.True(t, performQuery(req)["mode"] == READWRITE.String())
+	// Test Set IMPORT
+	testClient.SetMode(IMPORT)
+	assert.True(t, performQuery(req)["mode"] == IMPORT.String())
+	// Test Set READWRITE
+	testClient.SetMode(READONLY)
+	assert.True(t, performQuery(req)["mode"] == READONLY.String())
+
+	testClient.SetMode(IMPORT)
+}
+
+func TIsImportModeReady(t *testing.T) {
+	testClient.SetMode(IMPORT)
+	assert.True(t, testClient.IsImportModeReady())
+	testClient.SetMode(READWRITE)
+	assert.False(t, testClient.IsImportModeReady())
+	testClient.SetMode(IMPORT)
+}
+
+func TGetSubjectWithVersions(t *testing.T) {
+	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, testingSubject, 10001, 1, "AVRO")
 
 	aChan := make(chan map[string][]int64)
-	go testSClient.GetSubjectsWithVersions(aChan)
+	go testClient.GetSubjectsWithVersions(aChan)
 	result := <- aChan
 
-	assert.NotNil(t, result["testSubject"])
-	assert.Equal(t, []int64{1}, result["testSubject"])
-
-	registryHandler.AssertExpectations(t)
+	assert.NotNil(t, result[testingSubject])
+	assert.Equal(t, []int64{1}, result[testingSubject])
 }
 
+func TGetVersions(t *testing.T) {
+	var aGroup sync.WaitGroup
 
-func TestModeReadiness(t *testing.T) {
-	registryHandler := &httpmock.MockHandler{}
-	memMode := "IMPORT"
-	mockModeRecord := &ModeRecord{Mode: memMode}
-	modeJson, _ := json.Marshal(mockModeRecord)
+	aChan := make(chan SubjectWithVersions)
+	go testClient.GetVersions(testingSubject, aChan, &aGroup)
+	aGroup.Add(1)
+	result := <- aChan
+	aGroup.Wait()
 
-	registryHandler.On("Handle","PUT", "/mode", httpmock.JSONMatcher(mockModeRecord)).Return(
-		httpmock.Response{ Body: modeJson,
-		})
-
-	registryHandler.On("Handle","GET", "/mode", mock.Anything).Return(
-		httpmock.Response{ Body: modeJson,
-		})
-
-	server := httpmock.NewServer(registryHandler)
-	defer server.Close()
-
-	testSClient := NewSchemaRegistryClient(server.URL(), "mockKey", "mockSecret","src")
-
-	assert.True(t, testSClient.IsImportModeReady())
-	assert.True(t, testSClient.SetMode(memMode))
-
-	registryHandler.AssertExpectations(t)
-}
-
-
-
-func TestGetSchema(t *testing.T) {
-	registryHandler := &httpmock.MockHandler{}
-	mockSchema := SchemaRecord{
-		Subject: "test",
-		Schema:  "{\"field\" : \"value\"}",
-		SType:   "AVRO",
-		Version: 1,
-		Id:      10001,
+	correctResult := SubjectWithVersions{
+		Subject:  testingSubject,
+		Versions: []int64{1},
 	}
-	schemaJson, _ := json.Marshal(mockSchema)
-	registryHandler.On("Handle","GET", "/subjects/testSubject/versions/1", mock.Anything).Return(
-		httpmock.Response{ Body: schemaJson,
-		})
 
-	server := httpmock.NewServer(registryHandler)
-	defer server.Close()
-
-	testSClient := NewSchemaRegistryClient(server.URL(), "mockKey", "mockSecret","src")
-
-	record := testSClient.GetSchema("testSubject", 1)
-
-	assert.Equal(t, mockSchema,record)
-
-	registryHandler.AssertExpectations(t)
+	assert.Equal(t, correctResult, result)
 }
 
 
-func TestSchemaRegistration(t *testing.T) {
-	registryHandler := &httpmock.MockHandler{}
-	mockSchema := SchemaRecord{
-		Subject: "test",
-		Schema:  "{\"field\" : \"value\"}",
-		SType:   "AVRO",
-		Version: 1,
-		Id:      10001,
+func TGetSchema(t *testing.T) {
+	record := testClient.GetSchema(testingSubject, 1)
+	assert.Equal(t, mockSchema,record.Schema)
+}
+
+
+func TRegisterSchemaBySubjectAndIDAndVersion(t *testing.T) {
+	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, newSubject, 10001, 1, "AVRO")
+	record := testClient.GetSchema(newSubject, 1)
+	assert.Equal(t, mockSchema, record.Schema)
+
+	testClient.PerformSoftDelete(newSubject,1)
+	testClient.PerformHardDelete(newSubject, 1)
+}
+
+func TGetAllIDs (t *testing.T) {
+	aChan := make(chan map[int64]map[string]int64)
+	LowerBound = 10000
+	UpperBound = 10010
+
+	go testClient.GetAllIDs(aChan)
+	result := <- aChan
+
+	expected := map[int64]map[string]int64{
+		10001 : {testingSubject : 1}}
+
+	assert.Equal(t, expected, result)
+}
+
+func TIsID(t *testing.T) {
+	aChan := make (chan idSubjectVersion)
+	var aGroup sync.WaitGroup
+
+	aGroup.Add(1)
+	go testClient.isID(10001, aChan, &aGroup)
+	result := <- aChan
+	expected := idSubjectVersion{Id: 10001, SubjectAndVersion : map[string]int64{testingSubject : 1}}
+	assert.Equal(t, expected, result)
+}
+
+func TFilterListedSubjects (t *testing.T) {
+	mySubjects := []string{testingSubject, newSubject}
+
+	// Test Allow lists
+	AllowList = StringArrayFlag{
+		newSubject : true,
 	}
-	schemaJson, _ := json.Marshal(mockSchema)
-	registryHandler.On("Handle","POST", "/subjects/testSubject/versions", mock.Anything).Return(
-		httpmock.Response{ Body: schemaJson,
-		})
+	DisallowList = nil
 
-	server := httpmock.NewServer(registryHandler)
-	defer server.Close()
+	expected := map[string]bool{
+		newSubject : true,
+	}
+	assert.Equal(t, expected, filterListedSubjects(mySubjects))
 
-	testSClient := NewSchemaRegistryClient(server.URL(), "mockKey", "mockSecret","src")
+	// Test DisAllow lists
+	AllowList = nil
+	DisallowList = StringArrayFlag{
+		newSubject : true,
+	}
 
-	body, _ := ioutil.ReadAll(testSClient.RegisterSchemaBySubjectAndIDAndVersion(
-		html.EscapeString(string(schemaJson)),
-		"testSubject",
-		1,
-		10001,
-		"AVRO"))
+	expected = map[string]bool{
+		testingSubject : true,
+	}
+	assert.Equal(t, expected, filterListedSubjects(mySubjects))
 
-	gotStruct := SchemaRecord{}
-	json.Unmarshal(body,&gotStruct)
+	// Test Both
+	mySubjects = []string{testingSubject, newSubject, "hello", "ImASubject"}
+	AllowList = StringArrayFlag{
+		newSubject : true,
+		testingSubject : true,
+		"hello" : true,
+	}
+	DisallowList = StringArrayFlag{
+		"hello" : true,
+	}
 
-	assert.Equal(t, gotStruct.Schema, mockSchema.Schema)
+	// Expect hello to be disallowed
+	expected = map[string]bool{
+		newSubject : true,
+		testingSubject : true,
+	}
+	assert.Equal(t, expected, filterListedSubjects(mySubjects))
 
-	registryHandler.AssertExpectations(t)
+	AllowList = nil
+	DisallowList = nil
+
+}
+
+func TFilterListedSubjectsVersions (t *testing.T) {
+	mySubjects := []SubjectVersion{
+		{newSubject, 1},
+		{testingSubject, 1},
+	}
+
+	// Test Allow lists
+	AllowList = StringArrayFlag{
+		newSubject : true,
+	}
+	DisallowList = nil
+
+	expected := []SubjectVersion{{Subject: newSubject, Version: 1}}
+	assert.Equal(t, expected, filterListedSubjectsVersions(mySubjects))
+
+	// Test DisAllow lists
+	AllowList = nil
+	DisallowList = StringArrayFlag{
+		newSubject : true,
+	}
+
+	expected = []SubjectVersion{{Subject: testingSubject, Version: 1}}
+	assert.Equal(t, expected, filterListedSubjectsVersions(mySubjects))
+
+	// Test Both
+	mySubjects = []SubjectVersion{
+		{newSubject, 1},
+		{testingSubject, 1},
+		{"hello", 1},
+		{"ImASubject",1},
+	}
+
+	AllowList = StringArrayFlag{
+		newSubject : true,
+		testingSubject : true,
+		"hello" : true,
+	}
+	DisallowList = StringArrayFlag{
+		"hello" : true,
+	}
+
+	// Expect hello to be disallowed, expect ImASubject to not be included regardless
+	expected = []SubjectVersion{{Subject: testingSubject, Version: 1},{Subject: newSubject, Version: 1}}
+	areEqual := compareSlices(expected, filterListedSubjectsVersions(mySubjects))
+	assert.True(t, areEqual)
+
+	AllowList = nil
+	DisallowList = nil
+
+}
+
+func TPerformSoftDelete(t *testing.T) {
+	//Soft delete it
+	testClient.PerformSoftDelete(testingSubject,1)
+	//Check for it
+	checkIfSchemaRegistered := testClient.GetSchema(testingSubject,1)
+	assert.Equal(t, "", checkIfSchemaRegistered.Schema)
+}
+
+func TPerformHardDelete(t *testing.T) {
+	//Hard delete it
+	testClient.PerformHardDelete(testingSubject,1)
+
+	//Check if it is still an ID
+	aChan := make (chan map[int64]map[string]int64)
+	go testClient.GetAllIDs(aChan)
+	checkIfIDRegistered := <- aChan
+	assert.Nil(t, checkIfIDRegistered[10001])
+}
+
+func TDeleteAllSubjectsPermanently (t *testing.T) {
+	/*
+	By testing:
+	GetSubjectsWithVersions
+	PerformSoftDelete
+	and PerformHardDelete
+	We inherently test this method.
+	 */
+	assert.True(t, true)
+}
+
+
+func setImportMode () {
+	if !testClient.IsImportModeReady() {
+		err := testClient.SetMode(IMPORT)
+		if err == false {
+			log.Fatalln("Could not set registry to IMPORT ModeRecord.")
+		}
+	}
+}
+
+func performQuery (req *http.Request) map[string]string {
+	response := map[string]string{}
+
+	res, err := httpClient.Do(req)
+	if err != nil {
+		log.Println(err.Error())
+		return nil
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Printf(err.Error())
+	}
+	err = json.Unmarshal(body,&response)
+	if err != nil {
+		log.Printf(err.Error())
+	}
+
+	return response
+
+}
+
+func compareSlices (a, b []SubjectVersion) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	sliceAMap := map[SubjectVersion]bool{}
+	sliceBMap := map[SubjectVersion]bool{}
+
+	for _ , val := range a {
+		sliceAMap[val] = false
+	}
+	for _ , val := range b {
+		sliceBMap[val] = false
+	}
+
+	for val, _ := range sliceAMap {
+		_, exists := sliceBMap[val]
+		if !exists {
+			return false
+		}
+	}
+	return true
 }

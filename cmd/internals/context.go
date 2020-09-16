@@ -20,6 +20,7 @@ func GetFlags() {
 	flag.StringVar(&DestSRUrl, "dest-sr-url", "", "Url to the Destination Schema Registry Cluster")
 	flag.StringVar(&DestSRKey, "dest-sr-key", "", "API KEY for the Destination Schema Registry Cluster")
 	flag.StringVar(&DestSRSecret, "dest-sr-secret", "", "API SECRET for the Destination Schema Registry Cluster")
+	flag.StringVar(&CustomDestinationName, "customDestination", "", "Name of the implementation to be used as a destination (same as mapping)")
 	flag.IntVar(&HttpCallTimeout, "timeout", 60, "Timeout, in seconds, to use for all REST calls with the Schema Registries")
 	flag.IntVar(&ScrapeInterval, "scrapeInterval", 60, "Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds")
 	flag.StringVar(&PathToWrite, "getLocalCopyPath", "",
@@ -32,13 +33,19 @@ func GetFlags() {
 	usageFlag := flag.Bool("usage", false, "Print the usage of this tool")
 	batchExportFlag := flag.Bool("batchExport", false, "Perform a one-time export of all schemas")
 	syncFlag := flag.Bool("sync", false, "Sync schemas continuously")
-	localCopyFlag := flag.Bool("getLocalCopy", false, "Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path")
+	localCopyFlag := flag.Bool("getLocalCopy", false, "Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path of the binaries.")
 	deleteFlag := flag.Bool("deleteAllFromDestination", false, "Setting this will run a delete on all schemas written to the destination registry. No respect for allow/disallow lists.")
 	syncDeletesFlag := flag.Bool("syncDeletes", false, "Setting this will sync soft deletes from the source cluster to the destination")
 	syncHardDeletesFlag := flag.Bool("syncHardDeletes", false, "Setting this will sync hard deletes from the source cluster to the destination")
+	noPromptFlag := flag.Bool("noPrompt", false, "Set this flag to avoid checks while running. Assure you have the destination SR to correct Mode and Compatibility.")
+
 
 
 	flag.Parse()
+
+	if *noPromptFlag {
+		NoPrompt = true
+	}
 
 	if *syncDeletesFlag {
 		SyncDeletes = true
@@ -73,15 +80,15 @@ func GetFlags() {
 	}
 
 	if *localCopyFlag {
-		RunMode = "LOCAL"
+		ThisRun = LOCAL
 	}
 
 	if *batchExportFlag {
-		RunMode = "BATCH"
+		ThisRun = BATCH
 	}
 
 	if *syncFlag {
-		RunMode = "SYNC"
+		ThisRun = SYNC
 	}
 
 }

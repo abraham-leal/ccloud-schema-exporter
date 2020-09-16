@@ -20,12 +20,52 @@ var SrcSRSecret string
 var DestSRUrl string
 var DestSRKey string
 var DestSRSecret string
-var RunMode string
+var CustomDestinationName string
+var NoPrompt bool
 var SyncDeletes bool
 var SyncHardDeletes bool
+var ThisRun RunMode
 var PathToWrite string
-var TestHarnessRun bool
+var CancelRun bool
 var LowerBound int64
 var UpperBound int64
 var AllowList StringArrayFlag
 var DisallowList StringArrayFlag
+
+// Define RunMode Enum
+type RunMode int
+const(
+	SYNC RunMode = iota
+	BATCH
+	LOCAL
+)
+func (r RunMode) String() string {
+	return [...]string{"SYNC", "BATCH", "LOCAL"}[r]
+}
+
+// Define Mode Enum
+type Mode int
+const(
+	IMPORT Mode = iota
+	READONLY
+	READWRITE
+)
+func (m Mode) String() string {
+	return [...]string{"IMPORT", "READONLY", "READWRITE"}[m]
+}
+
+// Define Compatibility Enum
+type Compatibility int
+const(
+	BACKWARD Compatibility = iota
+	BACKWARD_TRANSITIVE
+	FORWARD
+	FORWARD_TRANSITIVE
+	FULL
+	FULL_TRANSITIVE
+	NONE
+)
+func (c Compatibility) String() string {
+	return [...]string{"BACKWARD", "BACKWARD_TRANSITIVE", "FORWARD", "FORWARD_TRANSITIVE", "FULL", "FULL_TRANSITIVE", "NONE"}[c]
+}
+

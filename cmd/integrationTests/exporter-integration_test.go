@@ -112,13 +112,12 @@ func TestExportMode(t *testing.T) {
 func TestLocalMode(t *testing.T) {
 	log.Println("Test Local Mode!")
 
-	setImportMode()
 	setupSource()
 
 	client.DisallowList = nil
 	client.AllowList = nil
 
-	assert.True(t,testLocalCopy(6))
+	testLocalCopy(t,6)
 
 	log.Println("Test Local Mode With Allow Lists!")
 
@@ -127,7 +126,7 @@ func TestLocalMode(t *testing.T) {
 		testingSubjectValue: true,
 	}
 
-	assert.True(t,testLocalCopy(3))
+	testLocalCopy(t,3)
 
 	log.Println("Test Local Mode With Disallow Lists!")
 
@@ -136,7 +135,7 @@ func TestLocalMode(t *testing.T) {
 		testingSubjectValue: true,
 	}
 
-	assert.True(t,testLocalCopy(3))
+	testLocalCopy(t,3)
 
 }
 
@@ -144,14 +143,14 @@ func TestLocalMode(t *testing.T) {
 func TestSyncMode(t *testing.T) {
 	log.Println("Test Sync Mode!")
 
-	client.TestHarnessRun = false
+	client.CancelRun = false
 	client.AllowList = nil
 	client.DisallowList = nil
 
 	setImportMode()
 	setupSource()
 
-	assert.True(t, commonSyncTest(2,6))
+	commonSyncTest(t,2,6)
 
 	log.Println("Testing hard delete sync for whole ID")
 
@@ -222,7 +221,7 @@ func TestSyncMode(t *testing.T) {
 	cleanup()
 
 	log.Println("Test Sync Mode With Allow Lists!")
-	client.TestHarnessRun = false
+	client.CancelRun = false
 	setupSource()
 
 	client.AllowList = map[string]bool{
@@ -230,12 +229,12 @@ func TestSyncMode(t *testing.T) {
 	}
 	client.DisallowList = nil
 
-	assert.True(t, commonSyncTest(1,3))
+	commonSyncTest(t,1,3)
 	killAsyncRoutine()
 	cleanup()
 
 	log.Println("Test Sync Mode With Allow Lists!")
-	client.TestHarnessRun = false
+	client.CancelRun = false
 	setupSource()
 
 	client.AllowList = nil
@@ -243,7 +242,7 @@ func TestSyncMode(t *testing.T) {
 		testingSubjectValue: true,
 	}
 
-	assert.True(t, commonSyncTest(1,3))
+	commonSyncTest(t,1,3)
 	killAsyncRoutine()
 	cleanup()
 
@@ -261,7 +260,7 @@ func startAsyncRoutine () {
 
 func killAsyncRoutine () {
 	log.Println("Killing sync goroutine")
-	client.TestHarnessRun = true
+	client.CancelRun = true
 	time.Sleep(time.Duration(3) * time.Second) // Give thread time to die
 }
 
@@ -332,21 +331,21 @@ func setupSource () {
 
 func setImportMode () {
 	if !testClientDst.IsImportModeReady() {
-		err := testClientDst.SetMode("IMPORT")
+		err := testClientDst.SetMode(client.IMPORT)
 		if err == false {
 			log.Fatalln("Could not set destination registry to IMPORT ModeRecord.")
 		}
 	}
 
 	if !testClientSrc.IsImportModeReady() {
-		err := testClientSrc.SetMode("IMPORT")
+		err := testClientSrc.SetMode(client.IMPORT)
 		if err == false {
 			log.Fatalln("Could not set source registry to IMPORT ModeRecord.")
 		}
 	}
 }
 
-func testSoftDelete (lenOfDestSubjects int) bool {
+func testSoftDelete (t *testing.T, lenOfDestSubjects int) {
 	log.Println(softDeleteLogMessage)
 
 	// Assert schemas in dest deep equal schemas in src
@@ -369,10 +368,11 @@ func testSoftDelete (lenOfDestSubjects int) bool {
 	destSubjects = <- destChan
 	printSubjectTestResult(srcSubjects, destSubjects)
 
-	return reflect.DeepEqual(srcSubjects, destSubjects) && len(destSubjects) == lenOfDestSubjects
+	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
+	assert.True(t, len(destSubjects) == lenOfDestSubjects)
 }
 
-func testInitialSync (lenOfDestSubjects int) bool  {
+func testInitialSync (t *testing.T, lenOfDestSubjects int)  {
 	log.Println("Testing initial sync")
 	// Assert schemas in dest deep equal schemas in src
 	srcSubjects := make (map[string][]int64)
@@ -389,10 +389,11 @@ func testInitialSync (lenOfDestSubjects int) bool  {
 
 	printSubjectTestResult(srcSubjects, destSubjects)
 
-	return reflect.DeepEqual(srcSubjects, destSubjects) && (len(destSubjects) == lenOfDestSubjects)
+	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
+	assert.True(t, len(destSubjects) == lenOfDestSubjects)
 }
 
-func testRegistrationSync (lenOfDestSubjects int) bool {
+func testRegistrationSync (t *testing.T, lenOfDestSubjects int) {
 	log.Println("Testing registration sync")
 
 	// Assert schemas in dest deep equal schemas in src
@@ -423,10 +424,11 @@ func testRegistrationSync (lenOfDestSubjects int) bool {
 	destSubjects = <- destChan
 	printSubjectTestResult(srcSubjects, destSubjects)
 
-	return reflect.DeepEqual(srcSubjects, destSubjects) && (len(destSubjects) == lenOfDestSubjects)
+	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
+	assert.True(t, len(destSubjects) == lenOfDestSubjects)
 }
 
-func testHardDeleteSync (lenOfDestIDs int) bool {
+func testHardDeleteSync (t *testing.T, lenOfDestIDs int) {
 
 	log.Println(hardDeleteLogMessage)
 
@@ -448,23 +450,26 @@ func testHardDeleteSync (lenOfDestIDs int) bool {
 	dstIDs = <- bChan
 	printIDTestResult(srcIDs, dstIDs)
 
-	return reflect.DeepEqual(srcIDs, dstIDs) && (len(dstIDs) == lenOfDestIDs)
+	assert.True(t, reflect.DeepEqual(srcIDs, dstIDs))
+	assert.True(t, len(dstIDs) == lenOfDestIDs)
+
 }
 
-func testLocalCopy (expectedFilesToWrite int) bool {
+func testLocalCopy (t *testing.T, expectedFilesToWrite int) {
 
 	currentPath, _ := os.Getwd()
+	currentPath = filepath.Clean(currentPath)
 
 	// Test Relative Paths
-	err := os.Mkdir(filepath.Dir(currentPath)+localRelativePath, 0755)
+	err := os.Mkdir(currentPath+localRelativePath, 0755)
 	if err != nil {
 		panic(err)
 	}
 
-	defer os.RemoveAll(filepath.Dir(currentPath)+localRelativePath)
-	client.WriteToFS(testClientSrc, "testingLocalBackupRelativePath")
+	defer os.RemoveAll(currentPath+localRelativePath)
+	client.WriteToFS(testClientSrc, "testingLocalBackupRelativePath", currentPath)
 
-	files, err2 := ioutil.ReadDir(filepath.Dir(currentPath)+localRelativePath)
+	files, err2 := ioutil.ReadDir(currentPath+localRelativePath)
 	if err2 != nil {
 		panic(err2)
 	}
@@ -472,26 +477,25 @@ func testLocalCopy (expectedFilesToWrite int) bool {
 	// Test Absolute Paths
 	_ = os.Mkdir(localAbsPath, 0755)
 	defer os.RemoveAll(localAbsPath)
-	client.WriteToFS(testClientSrc, localAbsPath)
+	client.WriteToFS(testClientSrc, localAbsPath, currentPath)
 
 	files2,_ := ioutil.ReadDir(localAbsPath)
 
-	return (len(files2) == expectedFilesToWrite) && (len(files) == expectedFilesToWrite)
+	assert.True(t, len(files2) == expectedFilesToWrite)
+	assert.True(t, len(files) == expectedFilesToWrite)
 }
 
-func commonSyncTest (lenOfDestSubjects int, lenOfDestIDs int ) bool {
+func commonSyncTest (t *testing.T, lenOfDestSubjects int, lenOfDestIDs int ) {
 
 	startAsyncRoutine()
-	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
-	resultInitial :=  testInitialSync(lenOfDestSubjects)
-	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
-	resultRegistration :=  testRegistrationSync(lenOfDestSubjects)
-	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
-	resultSoftDelete :=  testSoftDelete(lenOfDestSubjects)
-	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
-	resultHardDelete :=  testHardDeleteSync(lenOfDestIDs)
-	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
-
-	return resultInitial && resultRegistration && resultSoftDelete && resultHardDelete
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
+	testInitialSync(t, lenOfDestSubjects)
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
+	testRegistrationSync(t, lenOfDestSubjects)
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
+	testSoftDelete(t, lenOfDestSubjects)
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
+	testHardDeleteSync(t, lenOfDestIDs)
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 
 }

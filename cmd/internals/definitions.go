@@ -8,6 +8,7 @@ package client
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
 	"unicode"
 )
@@ -18,6 +19,26 @@ type SchemaRegistryClient struct {
 	SRApiSecret  string
 	InMemSchemas map[string][]int64
 	InMemIDs	 map[int64]map[string]int64
+}
+
+/*
+Any struct that implements this interface is able to run an instance of sync and batch exporting.
+ */
+type CustomDestination interface {
+	// Perform any set-up behavior before start of sync/batch export
+	SetUp() error
+	// An implementation should handle the registration of a schema in the destination.
+	// The SchemaRecord struct provides all details needed for registration.
+	RegisterSchema(record SchemaRecord) error
+	// An implementation should handle the deletion of a schema in the destination.
+	// The SchemaRecord struct provides all details needed for deletion.
+	DeleteSchema(record SchemaRecord) error
+	// An implementation should be able to send exactly one map describing the state of the destination
+	// This map should be minimal. Describing only the Subject and Versions that already exist.
+	// We assume this operation to be best done asynchronously, hence the channel.
+	GetDestinationState(channel chan <- map[string][]int64) error
+	// Perform any tear-down behavior before stop of sync/batch export
+	TearDown() error
 }
 
 type SchemaRecord struct {
@@ -55,6 +76,10 @@ type ModeRecord struct {
 	Mode string 	`json:"mode"`
 }
 
+type CompatRecord struct {
+	Compatibility string 	`json:"compatibility"`
+}
+
 type SubjectWithVersions struct {
 	Subject string
 	Versions []int64
@@ -72,9 +97,10 @@ func (i *StringArrayFlag) String() string {
 }
 
 func (i *StringArrayFlag) Set(value string) error {
+	currentPath, _ := os.Getwd()
 
 	if strings.LastIndexAny(value,"/.") != -1 {
-		path := CheckPath(value)
+		path := CheckPath(value, currentPath)
 		f , err := ioutil.ReadFile(path)
 		if err != nil {
 			panic(err)
