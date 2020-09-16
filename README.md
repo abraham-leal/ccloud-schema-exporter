@@ -186,7 +186,7 @@ type CustomDestination interface {
 	// This map should be minimal. Describing only the Subject and Versions that already exist.
 	// We assume this operation to be best done asynchronously, hence the channel.
 	GetDestinationState(channel chan <- map[string][]int64) error
-	// Perform any tear-down behavior before start of sync/batch export
+	// Perform any tear-down behavior before stop of sync/batch export
 	TearDown() error
 }
 ````
