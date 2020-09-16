@@ -37,7 +37,7 @@ func GetFlags() {
 	deleteFlag := flag.Bool("deleteAllFromDestination", false, "Setting this will run a delete on all schemas written to the destination registry. No respect for allow/disallow lists.")
 	syncDeletesFlag := flag.Bool("syncDeletes", false, "Setting this will sync soft deletes from the source cluster to the destination")
 	syncHardDeletesFlag := flag.Bool("syncHardDeletes", false, "Setting this will sync hard deletes from the source cluster to the destination")
-	noPromptFlag := flag.Bool("no-prompt", false, "Set this flag to avoid checks while running. Assure you have the destination SR to correct Mode and Compatibility.")
+	noPromptFlag := flag.Bool("noPrompt", false, "Set this flag to avoid checks while running. Assure you have the destination SR to correct Mode and Compatibility.")
 
 
 

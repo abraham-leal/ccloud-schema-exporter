@@ -67,13 +67,13 @@ func main() {
 	destSubjects := <- destChan
 	close(destChan)
 
-	if len(destSubjects) != 0 && client.ThisRun != client.SYNC && !client.NoPrompt {
+	if len(destSubjects) != 0 && client.ThisRun != client.SYNC && !client.NoPrompt{
 		log.Println("You have existing subjects registered in the destination registry, exporter cannot write schemas when " +
 			"previous schemas exist in batch mode.")
 		os.Exit(0)
 	}
 
-	if !destClient.IsImportModeReady() {
+	if !destClient.IsImportModeReady() && !client.NoPrompt {
 
 		fmt.Println("Destination Schema Registry is not set to IMPORT mode!")
 		fmt.Println("------------------------------------------------------")

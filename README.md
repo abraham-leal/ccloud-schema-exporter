@@ -46,7 +46,7 @@ docker run \
 
 A sample docker-compose is also provided at the root of this directory.
 
-The docker image handles `-sync -syncDeletes -syncHardDeletes -no-prompt` continuous sync. For a one time export, it is recommended to use a release binary.
+The docker image handles `-sync -syncDeletes -syncHardDeletes -noPrompt` continuous sync. For a one time export, it is recommended to use a release binary.
 
 If you'd like to pass custom flags, it is recommended to override the entry-point such as with `--entrypoint` with `/ccloud-schema-exporter` at the beginning of the override.
 
@@ -92,7 +92,7 @@ Usage of ./ccloud-schema-exporter:
     	Optional custom path for local copy. This must be an existing directory structure.
   -lowerBound int
     	Lower SR ID space bound (default 100000)
-  -no-prompt
+  -noPrompt
     	Set this flag to avoid checks while running. Assure you have the destination SR to correct Mode and Compatibility.
   -scrapeInterval int
     	Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds (default 60)
@@ -133,10 +133,11 @@ export DST_API_SECRET=XXXX
 #### Filtering the export
 
 It is now possible to filter the subjects which are sync-ed in all modes (`<-sync | -batchExport | -getLocalCopy>`).
-Setting `-allowList` or/and `-disallowList` flags will accept either a comma delimited string or a file containing
+Setting `-allowList` or/and `-disallowList` flags will accept either a comma delimited string, or a file containing
 comma delimited entries for subject names (keep in mind these subjects must have their postfixes such as `-value` or 
 `-key` to match the topic schema).
-These lists will be respected with schema sync, soft delete sync, and hard delete sync options.
+These lists will be respected with all run modes.
+If specifying a file, make sure it has an extension (such as `.txt`).
 A subject specified in `-disallowList` and `-allowList` will be disallowed by default.
 
 NOTE: Lists aren't respected with the utility `-deleteAllFromDestination`
@@ -157,7 +158,7 @@ You can expect about a 2-second increase in sync time.
 
 `ccloud-schema-exporter` is meant to be ran in a non-interactive way. 
 However, it does include some checks to assure things go smoothly in the replication flow.
-You can disable these checks by setting the configuration `-no-prompt`.
+You can disable these checks by setting the configuration `-noPrompt`.
 By default, the docker image has this in its entry point.
 
 There are two checks made:
@@ -167,10 +168,12 @@ This is not a requirement, but suggested since per-subject compatibility rules c
 Not setting this may result in some versions not being able to be registered since they do not adhere to the global compatibility mode.
 (The default compatibility in Confluent Cloud is `BACKWARD`).
 
+If you'd like more info on how to change the Schema Registry mode to enable non-interactive runs, see the [Schema Registry API Documentation](https://docs.confluent.io/current/schema-registry/develop/api.html#mode)
+
 #### Custom Destinations / Extendability
 
 `ccloud-schema-exporter` supports custom implementations of destinations.
-If you'd like to leverage the already built back-end, all you have to do is implement the `CustomDestination` interface.
+If you'd like to leverage the already built back-end, all you have to do is an implementation the `CustomDestination` interface.
 A copy of the interface definition is below for convenience:
 
 ````
@@ -226,11 +229,10 @@ The following options are respected for custom destinations as well:
     	Setting this will sync soft deletes from the source cluster to the destination
 ````
 
-
 #### Feature Requests / Issue Reporting
 
 This repo tracks feature requests and issues through Github Issues.
 If you'd like to see something fixed that wasn't caught by testing, or you'd like to see a new feature, please feel free
-to file a Github issue in this repo, I'll review and answer in best effort.
+to file a Github issue in this repo, I'll review and answer at best effort.
 
 Additionally, if you'd like to contribute a fix/feature, please feel free to open a PR for review.
