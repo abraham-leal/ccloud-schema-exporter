@@ -482,15 +482,15 @@ func testLocalCopy (expectedFilesToWrite int) bool {
 func commonSyncTest (lenOfDestSubjects int, lenOfDestIDs int ) bool {
 
 	startAsyncRoutine()
-	time.Sleep(time.Duration(7) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 	resultInitial :=  testInitialSync(lenOfDestSubjects)
-	time.Sleep(time.Duration(7) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 	resultRegistration :=  testRegistrationSync(lenOfDestSubjects)
-	time.Sleep(time.Duration(7) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 	resultSoftDelete :=  testSoftDelete(lenOfDestSubjects)
-	time.Sleep(time.Duration(7) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 	resultHardDelete :=  testHardDeleteSync(lenOfDestIDs)
-	time.Sleep(time.Duration(7) * time.Second) // Give time for sync
+	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 
 	return resultInitial && resultRegistration && resultSoftDelete && resultHardDelete
 

@@ -13,6 +13,7 @@ If you are looking to migrate schemas between On-Premise and Confluent Cloud, ch
 [Confluent Replicator](https://docs.confluent.io/current/connect/kafka-connect-replicator/index.html).
 
 The exporter expects the following variables to be set in the environment to make the necessary calls:
+(In the case of `-getLocalCopy` and `-customDestination` it does not need `DST_*` variables)
 
 - `SRC_SR_URL` : The URL for the source Schema Registry
 - `SRC_API_KEY` : The API KEY to be used to make calls to the source Schema Registry
@@ -134,13 +135,13 @@ export DST_API_SECRET=XXXX
 It is now possible to filter the subjects which are sync-ed in all modes (`<-sync | -batchExport | -getLocalCopy>`).
 Setting `-allowList` or/and `-disallowList` flags will accept either a comma delimited string or a file containing
 comma delimited entries for subject names (keep in mind these subjects must have their postfixes such as `-value` or 
-`-key` to match the topic schema.
+`-key` to match the topic schema).
 These lists will be respected with schema sync, soft delete sync, and hard delete sync options.
 A subject specified in `-disallowList` and `-allowList` will be disallowed by default.
 
 NOTE: Lists aren't respected with the utility `-deleteAllFromDestination`
 
-#### A Note on syncing hard deletions
+#### A note on syncing hard deletions
 
 Confluent Schema Registry does not provide a good way to discover the full space of IDs registered.
 Due to this, we do inefficient discovery of schema IDs. 
