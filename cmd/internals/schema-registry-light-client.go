@@ -16,27 +16,29 @@ import (
 	"sync"
 	"time"
 )
+
 /**
 Creates a lightweight client to schema registry in order to handle the necessary operations
 for syncing schema registries. Comes with helped methods for deletions that are exported.
 All functions are methods of SchemaRegistryClient
- */
+*/
 
 var statusError = "Received status code %d instead of 200 for %s, on %s"
+
 func NewSchemaRegistryClient(SR string, apiKey string, apiSecret string, target string) *SchemaRegistryClient {
 	client := SchemaRegistryClient{}
 
 	// If the parameters are empty, go fetch from env
-	if (SR == "" || apiKey == "" || apiSecret == "") {
-		if (target == "dst") {
-			client = SchemaRegistryClient{SRUrl: DestGetSRUrl(),SRApiKey: DestGetAPIKey(), SRApiSecret: DestGetAPISecret(), InMemSchemas: map[string][]int64{}, InMemIDs: map[int64]map[string]int64{}}
+	if SR == "" || apiKey == "" || apiSecret == "" {
+		if target == "dst" {
+			client = SchemaRegistryClient{SRUrl: DestGetSRUrl(), SRApiKey: DestGetAPIKey(), SRApiSecret: DestGetAPISecret(), InMemSchemas: map[string][]int64{}, srcInMemDeletedIDs: map[int64]map[string]int64{}}
 		}
-		if (target == "src"){
-			client = SchemaRegistryClient{SRUrl: SrcGetSRUrl(),SRApiKey: SrcGetAPIKey(), SRApiSecret: SrcGetAPISecret(), InMemSchemas: map[string][]int64{}, InMemIDs: map[int64]map[string]int64{}}
+		if target == "src" {
+			client = SchemaRegistryClient{SRUrl: SrcGetSRUrl(), SRApiKey: SrcGetAPIKey(), SRApiSecret: SrcGetAPISecret(), InMemSchemas: map[string][]int64{}, srcInMemDeletedIDs: map[int64]map[string]int64{}}
 		}
 	} else {
 		// Enables passing in the vars through flags
-		client = SchemaRegistryClient{SRUrl: SR,SRApiKey: apiKey, SRApiSecret: apiSecret, InMemSchemas: map[string][]int64{}, InMemIDs: map[int64]map[string]int64{}}
+		client = SchemaRegistryClient{SRUrl: SR, SRApiKey: apiKey, SRApiSecret: apiSecret, InMemSchemas: map[string][]int64{}, srcInMemDeletedIDs: map[int64]map[string]int64{}}
 	}
 
 	httpClient = http.Client{
@@ -48,20 +50,24 @@ func NewSchemaRegistryClient(SR string, apiKey string, apiSecret string, target 
 
 func (src *SchemaRegistryClient) IsReachable() bool {
 	endpoint := src.SRUrl
-	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
+	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
 		return false
 	}
 
-	if res.StatusCode == 200 {return true} else {return false}
+	if res.StatusCode == 200 {
+		return true
+	} else {
+		return false
+	}
 }
 
-func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[string][]int64) {
+func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan<- map[string][]int64) {
 	src.InMemSchemas = make(map[string][]int64)
-	endpoint := fmt.Sprintf("%s/subjects",src.SRUrl)
-	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
+	endpoint := fmt.Sprintf("%s/subjects", src.SRUrl)
+	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -69,14 +75,15 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[strin
 	}
 	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
-	response :=  []string{}
+	response := []string{}
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		log.Printf(err.Error())
 	}
+	res.Body.Close()
 
-	err = json.Unmarshal(body,&response)
+	err = json.Unmarshal(body, &response)
 	if err != nil {
 		log.Printf(err.Error())
 	}
@@ -118,10 +125,10 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan <- map[strin
 	chanY <- src.InMemSchemas
 }
 
-func (src *SchemaRegistryClient) GetVersions(subject string, chanX chan <- SubjectWithVersions, wg *sync.WaitGroup) {
-	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl,subject)
+func (src *SchemaRegistryClient) GetVersions(subject string, chanX chan<- SubjectWithVersions, wg *sync.WaitGroup) {
+	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl, subject)
 	defer wg.Done()
-	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
+	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -130,14 +137,15 @@ func (src *SchemaRegistryClient) GetVersions(subject string, chanX chan <- Subje
 	}
 	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
-	response :=  []int64{}
+	response := []int64{}
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		log.Printf(err.Error())
 	}
+	res.Body.Close()
 
-	err = json.Unmarshal(body,&response)
+	err = json.Unmarshal(body, &response)
 	if err != nil {
 		log.Printf(err.Error())
 	}
@@ -151,8 +159,8 @@ func (src *SchemaRegistryClient) GetVersions(subject string, chanX chan <- Subje
 	chanX <- pkgSbj
 }
 
-func (src *SchemaRegistryClient) IsCompatReady () bool {
-	response, ok  :=  handleEndpointQuery("config", src)
+func (src *SchemaRegistryClient) IsCompatReady() bool {
+	response, ok := handleEndpointQuery("config", src)
 	if !ok {
 		return false
 	}
@@ -164,8 +172,8 @@ func (src *SchemaRegistryClient) IsCompatReady () bool {
 	}
 }
 
-func (src *SchemaRegistryClient) SetGlobalCompatibility(comptToSet Compatibility) bool{
-	endpoint := fmt.Sprintf("%s/config",src.SRUrl)
+func (src *SchemaRegistryClient) SetGlobalCompatibility(comptToSet Compatibility) bool {
+	endpoint := fmt.Sprintf("%s/config", src.SRUrl)
 
 	compat := CompatRecord{Compatibility: comptToSet.String()}
 	toSend, err := json.Marshal(compat)
@@ -174,7 +182,7 @@ func (src *SchemaRegistryClient) SetGlobalCompatibility(comptToSet Compatibility
 		return false
 	}
 
-	req := GetNewRequest("PUT", endpoint, src.SRApiKey, src.SRApiSecret,bytes.NewReader(toSend))
+	req := GetNewRequest("PUT", endpoint, src.SRApiKey, src.SRApiSecret, bytes.NewReader(toSend))
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -185,12 +193,14 @@ func (src *SchemaRegistryClient) SetGlobalCompatibility(comptToSet Compatibility
 
 	if res.StatusCode == 200 {
 		return true
-	} else {return false}
+	} else {
+		return false
+	}
 
 }
 
-func (src *SchemaRegistryClient) IsImportModeReady () bool {
-	response, ok  :=  handleEndpointQuery("mode", src)
+func (src *SchemaRegistryClient) IsImportModeReady() bool {
+	response, ok := handleEndpointQuery("mode", src)
 	if !ok {
 		return false
 	}
@@ -202,8 +212,8 @@ func (src *SchemaRegistryClient) IsImportModeReady () bool {
 	}
 }
 
-func (src *SchemaRegistryClient) SetMode(modeToSet Mode) bool{
-	endpoint := fmt.Sprintf("%s/mode",src.SRUrl)
+func (src *SchemaRegistryClient) SetMode(modeToSet Mode) bool {
+	endpoint := fmt.Sprintf("%s/mode", src.SRUrl)
 
 	mode := ModeRecord{Mode: modeToSet.String()}
 	modeToSend, err := json.Marshal(mode)
@@ -212,7 +222,7 @@ func (src *SchemaRegistryClient) SetMode(modeToSet Mode) bool{
 		return false
 	}
 
-	req := GetNewRequest("PUT", endpoint, src.SRApiKey, src.SRApiSecret,bytes.NewReader(modeToSend))
+	req := GetNewRequest("PUT", endpoint, src.SRApiKey, src.SRApiSecret, bytes.NewReader(modeToSend))
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -223,13 +233,15 @@ func (src *SchemaRegistryClient) SetMode(modeToSet Mode) bool{
 
 	if res.StatusCode == 200 {
 		return true
-	} else {return false}
+	} else {
+		return false
+	}
 
 }
 
-func (src *SchemaRegistryClient) GetSchema (subject string, version int64) SchemaRecord {
-	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d",src.SRUrl,subject,version)
-	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
+func (src *SchemaRegistryClient) GetSchema(subject string, version int64) SchemaRecord {
+	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d", src.SRUrl, subject, version)
+	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -247,16 +259,38 @@ func (src *SchemaRegistryClient) GetSchema (subject string, version int64) Schem
 		return SchemaRecord{}
 	}
 
-	err = json.Unmarshal(body,&schemaResponse)
+	err = json.Unmarshal(body, &schemaResponse)
 	if err != nil {
 		log.Printf(err.Error())
 	}
 
-	return SchemaRecord{Subject: schemaResponse.Subject,Schema: schemaResponse.Schema, Version: schemaResponse.Version, Id: schemaResponse.Id, SType: schemaResponse.SType}.setTypeIfEmpty()
+	return SchemaRecord{Subject: schemaResponse.Subject, Schema: schemaResponse.Schema, Version: schemaResponse.Version, Id: schemaResponse.Id, SType: schemaResponse.SType}.setTypeIfEmpty()
 }
 
-func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion (schema string, subject string, id int64, version int64, SType string) io.ReadCloser {
-	endpoint := fmt.Sprintf("%s/subjects/%s/versions",src.SRUrl,subject)
+func (src *SchemaRegistryClient) RegisterSchema(schema string, subject string, SType string) io.ReadCloser {
+	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl, subject)
+
+	schemaRequest := SchemaToRegister{Schema: schema, SType: SType}
+	schemaJSON, err := json.Marshal(schemaRequest)
+	if err != nil {
+		log.Printf(err.Error())
+	}
+
+	req := GetNewRequest("POST", endpoint, src.SRApiKey, src.SRApiSecret, bytes.NewReader(schemaJSON))
+
+	res, err := httpClient.Do(req)
+	if err != nil {
+		log.Printf(err.Error())
+		log.Println("Could not register schema!")
+		return nil
+	}
+	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
+
+	return res.Body
+}
+
+func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion(schema string, subject string, id int64, version int64, SType string) io.ReadCloser {
+	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl, subject)
 
 	schemaRequest := SchemaToRegister{Schema: schema, Id: id, Version: version, SType: SType}
 	schemaJSON, err := json.Marshal(schemaRequest)
@@ -264,7 +298,7 @@ func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion (schema 
 		log.Printf(err.Error())
 	}
 
-	req := GetNewRequest("POST", endpoint, src.SRApiKey, src.SRApiSecret,bytes.NewReader(schemaJSON))
+	req := GetNewRequest("POST", endpoint, src.SRApiKey, src.SRApiSecret, bytes.NewReader(schemaJSON))
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -278,8 +312,8 @@ func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion (schema 
 }
 
 // Deletes all schemas in the registry
-func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently (){
-	destSubjects := make (map[string][]int64)
+func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently() {
+	destSubjects := make(map[string][]int64)
 	destChan := make(chan map[string][]int64)
 
 	// Account for allow/disallow lists, since this
@@ -291,14 +325,14 @@ func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently (){
 	AllowList = nil
 	DisallowList = nil
 	go src.GetSubjectsWithVersions(destChan)
-	destSubjects = <- destChan
+	destSubjects = <-destChan
 
 	AllowList = holderAllow
 	DisallowList = holderDisallow
 
 	//Must perform soft delete before hard delete
 	for subject, versions := range destSubjects {
-		for _ , version := range versions {
+		for _, version := range versions {
 			if src.PerformSoftDelete(subject, version) {
 				go src.PerformHardDelete(subject, version)
 			}
@@ -307,8 +341,8 @@ func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently (){
 }
 
 func (src *SchemaRegistryClient) PerformSoftDelete(subject string, version int64) bool {
-	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d",src.SRUrl,subject,version)
-	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret,nil)
+	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d", src.SRUrl, subject, version)
+	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret, nil)
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
@@ -319,8 +353,8 @@ func (src *SchemaRegistryClient) PerformSoftDelete(subject string, version int64
 }
 
 func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int64) bool {
-	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d?permanent=true",src.SRUrl,subject,version)
-	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret,nil)
+	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d?permanent=true", src.SRUrl, subject, version)
+	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret, nil)
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
@@ -330,73 +364,69 @@ func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int64
 	return handleDeletes(res.Body, res.StatusCode, req.Method, endpoint, "Hard", subject, version)
 }
 
-func (src *SchemaRegistryClient) GetAllIDs (aChan chan <- map[int64]map[string]int64) {
-	src.InMemIDs = map[int64]map[string]int64{} // Map of ID -> (Map of subject -> Version)
+func (src *SchemaRegistryClient) GetSoftDeletedIDs() map[int64]map[string]int64 {
+	src.srcInMemDeletedIDs = map[int64]map[string]int64{} // Map of ID -> (Map of subject -> Version)
 
-	var aGroup sync.WaitGroup
-	aSubChan := make(chan idSubjectVersion)
-	//Generate bounds
-	for i := LowerBound; i <= UpperBound; i++ {
-		aGroup.Add(1)
-		/*
-			Rate limit: In order not to saturate the SR instances, we limit the rate at which we send discovery requests.
-			The idea being that if one SR instance can handle the load, a cluster should be able to handle it
-			even more easily. During testing, it was found that 2ms is an ideal delay for best sync performance.
-		*/
-		time.Sleep(time.Duration(2) * time.Millisecond)
-		go src.isID(i, aSubChan, &aGroup)
+	responseWithDeletes := src.getSchemaList(true)
+	responseWithOutDeletes := src.getSchemaList(false)
+
+	listHolder := make(map[int64]map[string]int64)
+	for id, data := range responseWithDeletes {
+		_, contains := responseWithOutDeletes[id]
+		if !contains {
+			holder, seenBefore := listHolder[id]
+			if seenBefore {
+				holder[data.Subject] = data.Version
+				listHolder[id] = holder
+			} else {
+				newIdHolder := make(map[string]int64)
+				newIdHolder[data.Subject] = data.Version
+				listHolder[id] = newIdHolder
+			}
+		}
 	}
-	go func() {
-		aGroup.Wait()
-		close(aSubChan)
-	}()
 
-	//Collect SubjectWithVersions
-	for item := range aSubChan {
-		src.InMemIDs[item.Id] = item.SubjectAndVersion
-	}
-	aChan <- src.InMemIDs
-
+	src.srcInMemDeletedIDs = FilterIDs(listHolder)
+	return src.srcInMemDeletedIDs
 }
 
-func (src *SchemaRegistryClient) isID ( id int64, aChan chan <- idSubjectVersion, wg *sync.WaitGroup) {
-	answer := idSubjectVersion{}
-	defer wg.Done()
+func (src SchemaRegistryClient) getSchemaList(deleted bool) map[int64]SchemaExtraction {
 
-	endpoint := fmt.Sprintf("%s/schemas/ids/%d/versions", src.SRUrl, id)
+	endpoint := fmt.Sprintf("%s/schemas?deleted=%v", src.SRUrl, deleted)
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
 	res, err := httpClient.Do(req)
 	if err != nil {
-		log.Println(err.Error())
-		return
+		log.Fatalln(err.Error())
 	}
 
-	var manyPairs []SubjectVersion
-	var tempMapOfSubjectVersion = map[string]int64{}
+	response := []SchemaExtraction{}
+
 	body, err := ioutil.ReadAll(res.Body)
-	check(err)
-
-	if res.StatusCode == 200 {
-		_ = json.Unmarshal(body, &manyPairs)
-		manyPairs = filterListedSubjectsVersions(manyPairs)
-		for _ , subjectVer := range manyPairs {
-			tempMapOfSubjectVersion[subjectVer.Subject] = subjectVer.Version
-		}
-
-		if len(tempMapOfSubjectVersion) != 0 { // Do not add IDs with empty subject-version references
-			answer.Id = id
-			answer.SubjectAndVersion = tempMapOfSubjectVersion
-			aChan <- answer
-		}
+	if err != nil {
+		log.Printf(err.Error())
 	}
+	res.Body.Close()
+
+	err = json.Unmarshal(body, &response)
+	if err != nil {
+		log.Printf(err.Error())
+	}
+
+	responseMap := make(map[int64]SchemaExtraction)
+
+	for _, schema := range response {
+		responseMap[schema.Id] = schema
+	}
+
+	return responseMap
 }
 
-func handleDeletes (body io.Reader, statusCode int, method string, endpoint string,
+func handleDeletes(body io.Reader, statusCode int, method string, endpoint string,
 	reqType string, subject string, version int64) bool {
 	if statusCode != 200 {
 		body, _ := ioutil.ReadAll(body)
 		errorMsg := fmt.Sprintf(statusError, statusCode, method, endpoint)
-		log.Printf("ERROR: %s, HTTP Response: %s",errorMsg, string(body))
+		log.Printf("ERROR: %s, HTTP Response: %s", errorMsg, string(body))
 	} else {
 		log.Println(fmt.Sprintf("%s deleted subject: %s, version: %d", reqType, subject, version))
 		return true
@@ -404,19 +434,19 @@ func handleDeletes (body io.Reader, statusCode int, method string, endpoint stri
 	return false
 }
 
-func handleNotSuccess (body io.Reader, statusCode int, method string, endpoint string){
+func handleNotSuccess(body io.Reader, statusCode int, method string, endpoint string) {
 	if statusCode != 200 {
 		body, _ := ioutil.ReadAll(body)
 		errorMsg := fmt.Sprintf(statusError, statusCode, method, endpoint)
-		log.Printf("ERROR: %s, HTTP Response: %s",errorMsg, string(body))
+		log.Printf("ERROR: %s, HTTP Response: %s", errorMsg, string(body))
 	}
 }
 
-func filterListedSubjects (response []string) map[string]bool {
+func filterListedSubjects(response []string) map[string]bool {
 	// Start allow list work
 	subjectMap := map[string]bool{}
 
-	for _ ,s := range response { // Generate a map of subjects for easier manipulation
+	for _, s := range response { // Generate a map of subjects for easier manipulation
 		subjectMap[s] = true
 	}
 
@@ -438,11 +468,10 @@ func filterListedSubjects (response []string) map[string]bool {
 	return subjectMap
 }
 
-
-func filterListedSubjectsVersions (response []SubjectVersion) []SubjectVersion {
+func filterListedSubjectsVersions(response []SubjectVersion) []SubjectVersion {
 	subjectMap := map[string]int64{}
 
-	for _ ,s := range response { // Generate a map of subjects for easier manipulation
+	for _, s := range response { // Generate a map of subjects for easier manipulation
 		subjectMap[s.Subject] = s.Version
 	}
 
@@ -473,9 +502,34 @@ func filterListedSubjectsVersions (response []SubjectVersion) []SubjectVersion {
 	return subjectVersionSlice
 }
 
-func handleEndpointQuery (end string, src *SchemaRegistryClient) (map[string]string, bool) {
-	endpoint := fmt.Sprintf("%s/%s",src.SRUrl, end)
-	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret,nil)
+func FilterIDs(candidate map[int64]map[string]int64) map[int64]map[string]int64 {
+
+	for id, subjects := range candidate { // Filter out for allow lists
+		for sbj, _ := range subjects {
+			if AllowList != nil { // If allow list is defined
+				_, allowContains := AllowList[sbj]
+				if !allowContains { // If allow list does not contain it, delete it
+					delete(candidate[id], sbj)
+				}
+			}
+			if DisallowList != nil { // If disallow list is defined
+				_, disallowContains := DisallowList[sbj]
+				if disallowContains { // If disallow list contains it, delete it
+					delete(candidate[id], sbj)
+				}
+			}
+		}
+		if len(subjects) == 0 {
+			delete(candidate, id)
+		}
+	}
+
+	return candidate
+}
+
+func handleEndpointQuery(end string, src *SchemaRegistryClient) (map[string]string, bool) {
+	endpoint := fmt.Sprintf("%s/%s", src.SRUrl, end)
+	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -492,7 +546,7 @@ func handleEndpointQuery (end string, src *SchemaRegistryClient) (map[string]str
 		return nil, false
 	}
 
-	err = json.Unmarshal(body,&response)
+	err = json.Unmarshal(body, &response)
 	if err != nil {
 		log.Printf(err.Error())
 	}

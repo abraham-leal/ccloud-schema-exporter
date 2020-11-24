@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func RunCustomDestinationSync (srcClient *SchemaRegistryClient, customDest CustomDestination) {
+func RunCustomDestinationSync(srcClient *SchemaRegistryClient, customDest CustomDestination) {
 	err := customDest.SetUp()
 	if err != nil {
 		log.Println("Could not perform proper set-up of custom destination")
@@ -38,8 +38,8 @@ func RunCustomDestinationSync (srcClient *SchemaRegistryClient, customDest Custo
 		}
 		beginSync := time.Now()
 
-		srcSubjects := make (map[string][]int64)
-		destSubjects := make (map[string][]int64)
+		srcSubjects := make(map[string][]int64)
+		destSubjects := make(map[string][]int64)
 
 		srcChan := make(chan map[string][]int64)
 		destChan := make(chan map[string][]int64)
@@ -47,17 +47,16 @@ func RunCustomDestinationSync (srcClient *SchemaRegistryClient, customDest Custo
 		go srcClient.GetSubjectsWithVersions(srcChan)
 		go customDest.GetDestinationState(destChan)
 
-		srcSubjects = <- srcChan
-		destSubjects = <- destChan
+		srcSubjects = <-srcChan
+		destSubjects = <-destChan
 
-
-		if !reflect.DeepEqual(srcSubjects,destSubjects) {
+		if !reflect.DeepEqual(srcSubjects, destSubjects) {
 			diff := GetSubjectDiff(srcSubjects, destSubjects)
 			// Perform sync
 			customSync(diff, srcClient, customDest)
 			//We anticipate that the custom destination will not have
 			if SyncDeletes {
-				customSyncDeletes(destSubjects,srcSubjects,srcClient,customDest)
+				customSyncDeletes(destSubjects, srcSubjects, srcClient, customDest)
 			}
 		}
 		syncDuration := time.Since(beginSync)
@@ -67,7 +66,7 @@ func RunCustomDestinationSync (srcClient *SchemaRegistryClient, customDest Custo
 	}
 }
 
-func RunCustomDestinationBatch (srcClient *SchemaRegistryClient, customDest CustomDestination) {
+func RunCustomDestinationBatch(srcClient *SchemaRegistryClient, customDest CustomDestination) {
 	err := customDest.SetUp()
 	if err != nil {
 		log.Println("Could not perform proper set-up of custom destination")
@@ -85,10 +84,10 @@ func RunCustomDestinationBatch (srcClient *SchemaRegistryClient, customDest Cust
 
 	srcChan := make(chan map[string][]int64)
 	go srcClient.GetSubjectsWithVersions(srcChan)
-	srcSubjects := <- srcChan
+	srcSubjects := <-srcChan
 
 	log.Println("Registering all schemas from " + srcClient.SRUrl)
-	for srcSubject , srcVersions := range srcSubjects {
+	for srcSubject, srcVersions := range srcSubjects {
 		if CancelRun == true {
 			err := customDest.TearDown()
 			if err != nil {
@@ -97,8 +96,8 @@ func RunCustomDestinationBatch (srcClient *SchemaRegistryClient, customDest Cust
 			}
 			return
 		}
-		for _ , v := range srcVersions {
-			schema := srcClient.GetSchema(srcSubject,v)
+		for _, v := range srcVersions {
+			schema := srcClient.GetSchema(srcSubject, v)
 			log.Printf("Registering schema: %s with version: %d and ID: %d and Type: %s",
 				schema.Subject, schema.Version, schema.Id, schema.SType)
 			err := customDest.RegisterSchema(schema)
@@ -107,7 +106,7 @@ func RunCustomDestinationBatch (srcClient *SchemaRegistryClient, customDest Cust
 	}
 }
 
-func customSync (diff map[string][]int64, srcClient *SchemaRegistryClient, customDest CustomDestination) {
+func customSync(diff map[string][]int64, srcClient *SchemaRegistryClient, customDest CustomDestination) {
 	if len(diff) != 0 {
 		log.Println("Source registry has values that Destination does not, syncing...")
 		for subject, versions := range diff {
@@ -124,7 +123,7 @@ func customSync (diff map[string][]int64, srcClient *SchemaRegistryClient, custo
 	}
 }
 
-func customSyncDeletes (destSubjects map[string][]int64, srcSubjects map[string][]int64, srcClient *SchemaRegistryClient, customDest CustomDestination) {
+func customSyncDeletes(destSubjects map[string][]int64, srcSubjects map[string][]int64, srcClient *SchemaRegistryClient, customDest CustomDestination) {
 	diff := GetSubjectDiff(destSubjects, srcSubjects)
 	if len(diff) != 0 {
 		log.Println("Source registry has deletes that Destination does not, syncing...")
@@ -141,23 +140,23 @@ func customSyncDeletes (destSubjects map[string][]int64, srcSubjects map[string]
 /*
 This is a simple example of implementing the CustomDestination interface.
 It holds schemas in memory and performs/reports all necessary calls.
- */
+*/
 
 type SampleCustomDestination struct {
 	inMemState map[string][]int64
 }
 
-func NewSampleCustomDestination () SampleCustomDestination {
+func NewSampleCustomDestination() SampleCustomDestination {
 	return SampleCustomDestination{inMemState: map[string][]int64{}}
 }
 
-func (cd SampleCustomDestination) SetUp () error {
+func (cd SampleCustomDestination) SetUp() error {
 	// Nothing to set up
 	return nil
 }
 
-func (cd SampleCustomDestination) RegisterSchema (record SchemaRecord) error {
-	currentVersionSlice , exists := cd.inMemState[record.Subject]
+func (cd SampleCustomDestination) RegisterSchema(record SchemaRecord) error {
+	currentVersionSlice, exists := cd.inMemState[record.Subject]
 	if exists {
 		tempVersionSlice := append(currentVersionSlice, record.Version)
 		cd.inMemState[record.Subject] = tempVersionSlice
@@ -169,13 +168,13 @@ func (cd SampleCustomDestination) RegisterSchema (record SchemaRecord) error {
 	return nil
 }
 
-func (cd SampleCustomDestination) DeleteSchema (record SchemaRecord) error {
-	currentVersionSlice , exists := cd.inMemState[record.Subject]
+func (cd SampleCustomDestination) DeleteSchema(record SchemaRecord) error {
+	currentVersionSlice, exists := cd.inMemState[record.Subject]
 	newSlice := currentVersionSlice
 	if exists {
 		for index, v := range currentVersionSlice {
 			if v == record.Version {
-				newSlice = removeFromSlice(currentVersionSlice,index)
+				newSlice = removeFromSlice(currentVersionSlice, index)
 			}
 		}
 		cd.inMemState[record.Subject] = newSlice
@@ -183,12 +182,12 @@ func (cd SampleCustomDestination) DeleteSchema (record SchemaRecord) error {
 	return nil
 }
 
-func (cd SampleCustomDestination) GetDestinationState (channel chan <- map[string][]int64) error {
+func (cd SampleCustomDestination) GetDestinationState(channel chan<- map[string][]int64) error {
 	channel <- cd.inMemState
 	return nil
 }
 
-func (cd SampleCustomDestination) TearDown () error {
+func (cd SampleCustomDestination) TearDown() error {
 	// Nothing to tear-down
 	return nil
 }
@@ -198,7 +197,7 @@ func removeFromSlice(s []int64, i int) []int64 {
 	return s[:len(s)-1]
 }
 
-func checkCouldNotRegister (err error) {
+func checkCouldNotRegister(err error) {
 	if err != nil {
 		log.Println("Could not register schema to destination:")
 		log.Println(err)

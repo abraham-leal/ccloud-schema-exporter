@@ -27,49 +27,47 @@ var SRUrl = "http://localhost:8081"
 
 func TestMainStack(t *testing.T) {
 	setup()
-	t.Run("TIsCompatReady", func(t *testing.T) {TIsCompatReady(t)})
-	t.Run("TSetCompat", func(t *testing.T) {TSetCompat(t)})
-	t.Run("TIsReachable", func(t *testing.T) {TIsReachable(t)})
-	t.Run("TSetMode", func(t *testing.T) {TSetMode(t)})
-	t.Run("TIsImportModeReady", func(t *testing.T) {TIsImportModeReady(t)})
-	t.Run("TGetSubjectWithVersions", func(t *testing.T) {TGetSubjectWithVersions(t)})
-	t.Run("TGetVersions", func(t *testing.T) {TGetVersions(t)})
-	t.Run("TGetSchema", func(t *testing.T) {TGetSchema(t)})
-	t.Run("TRegisterSchemaBySubjectAndIDAndVersion", func(t *testing.T) {TRegisterSchemaBySubjectAndIDAndVersion(t)})
-	t.Run("TGetAllIDs", func(t *testing.T) {TGetAllIDs(t)})
-	t.Run("TIsID", func(t *testing.T) {TIsID(t)})
-	t.Run("TFilterListedSubjects", func(t *testing.T) {TFilterListedSubjects(t)})
-	t.Run("TFilterListedSubjectsVersions", func(t *testing.T) {TFilterListedSubjectsVersions(t)})
-	t.Run("TPerformSoftDelete", func(t *testing.T) {TPerformSoftDelete(t)})
-	t.Run("TPerformHardDelete", func(t *testing.T) {TPerformHardDelete(t)})
-	t.Run("TDeleteAllSubjectsPermanently", func(t *testing.T) {TDeleteAllSubjectsPermanently(t)})
+	t.Run("TIsCompatReady", func(t *testing.T) { TIsCompatReady(t) })
+	t.Run("TSetCompat", func(t *testing.T) { TSetCompat(t) })
+	t.Run("TIsReachable", func(t *testing.T) { TIsReachable(t) })
+	t.Run("TSetMode", func(t *testing.T) { TSetMode(t) })
+	t.Run("TIsImportModeReady", func(t *testing.T) { TIsImportModeReady(t) })
+	t.Run("TGetSubjectWithVersions", func(t *testing.T) { TGetSubjectWithVersions(t) })
+	t.Run("TGetVersions", func(t *testing.T) { TGetVersions(t) })
+	t.Run("TGetSchema", func(t *testing.T) { TGetSchema(t) })
+	t.Run("TRegisterSchemaBySubjectAndIDAndVersion", func(t *testing.T) { TRegisterSchemaBySubjectAndIDAndVersion(t) })
+	t.Run("TFilterIDs", func(t *testing.T) { TFilterIDs(t) })
+	t.Run("TFilterListedSubjects", func(t *testing.T) { TFilterListedSubjects(t) })
+	t.Run("TFilterListedSubjectsVersions", func(t *testing.T) { TFilterListedSubjectsVersions(t) })
+	t.Run("TPerformSoftDelete", func(t *testing.T) { TPerformSoftDelete(t) })
+	t.Run("TPerformHardDelete", func(t *testing.T) { TPerformHardDelete(t) })
+	t.Run("TDeleteAllSubjectsPermanently", func(t *testing.T) { TDeleteAllSubjectsPermanently(t) })
 	tearDown()
 }
 
-func setup(){
-	composeEnv = testcontainers.NewLocalDockerCompose([]string{"../integrationTests/docker-compose-internal.yml"},"internals")
-	composeEnv.WithCommand([]string{"up","-d"}).Invoke()
+func setup() {
+	composeEnv = testcontainers.NewLocalDockerCompose([]string{"../integrationTests/docker-compose-internal.yml"}, "internals")
+	composeEnv.WithCommand([]string{"up", "-d"}).Invoke()
 	time.Sleep(time.Duration(25) * time.Second) // give services time to set up
 
-
-	testClient = NewSchemaRegistryClient(SRUrl,"testUser", "testPass", "src")
+	testClient = NewSchemaRegistryClient(SRUrl, "testUser", "testPass", "src")
 
 	//Initial schema
 	setImportMode()
 }
 
-func tearDown(){
-	composeEnv.WithCommand([]string{"down","-v"}).Invoke()
+func tearDown() {
+	composeEnv.WithCommand([]string{"down", "-v"}).Invoke()
 }
 
-func TIsReachable (t *testing.T) {
-	falseTestClient := NewSchemaRegistryClient("http://localhost:8083","testUser", "testPass", "src")
+func TIsReachable(t *testing.T) {
+	falseTestClient := NewSchemaRegistryClient("http://localhost:8083", "testUser", "testPass", "src")
 
 	assert.True(t, testClient.IsReachable())
 	assert.False(t, falseTestClient.IsReachable())
 }
 
-func TSetCompat (t *testing.T) {
+func TSetCompat(t *testing.T) {
 	endpoint := fmt.Sprintf("%s/config", SRUrl)
 	req := GetNewRequest("GET", endpoint, "testUser", "testPass", nil)
 	// Test Set READWRITE
@@ -93,7 +91,7 @@ func TIsCompatReady(t *testing.T) {
 	assert.True(t, testClient.IsCompatReady())
 }
 
-func TSetMode (t *testing.T) {
+func TSetMode(t *testing.T) {
 	endpoint := fmt.Sprintf("%s/mode", SRUrl)
 	req := GetNewRequest("GET", endpoint, "testUser", "testPass", nil)
 	// Test Set READWRITE
@@ -122,7 +120,7 @@ func TGetSubjectWithVersions(t *testing.T) {
 
 	aChan := make(chan map[string][]int64)
 	go testClient.GetSubjectsWithVersions(aChan)
-	result := <- aChan
+	result := <-aChan
 
 	assert.NotNil(t, result[testingSubject])
 	assert.Equal(t, []int64{1}, result[testingSubject])
@@ -134,7 +132,7 @@ func TGetVersions(t *testing.T) {
 	aChan := make(chan SubjectWithVersions)
 	go testClient.GetVersions(testingSubject, aChan, &aGroup)
 	aGroup.Add(1)
-	result := <- aChan
+	result := <-aChan
 	aGroup.Wait()
 
 	correctResult := SubjectWithVersions{
@@ -145,87 +143,141 @@ func TGetVersions(t *testing.T) {
 	assert.Equal(t, correctResult, result)
 }
 
-
 func TGetSchema(t *testing.T) {
 	record := testClient.GetSchema(testingSubject, 1)
-	assert.Equal(t, mockSchema,record.Schema)
+	assert.Equal(t, mockSchema, record.Schema)
 }
-
 
 func TRegisterSchemaBySubjectAndIDAndVersion(t *testing.T) {
 	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, newSubject, 10001, 1, "AVRO")
 	record := testClient.GetSchema(newSubject, 1)
 	assert.Equal(t, mockSchema, record.Schema)
 
-	testClient.PerformSoftDelete(newSubject,1)
+	testClient.PerformSoftDelete(newSubject, 1)
 	testClient.PerformHardDelete(newSubject, 1)
 }
 
-func TGetAllIDs (t *testing.T) {
-	aChan := make(chan map[int64]map[string]int64)
-	LowerBound = 10000
-	UpperBound = 10010
+func TGetSoftDeletedIDs(t *testing.T) {
+	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, newSubject, 10001, 1, "AVRO")
+	testClient.PerformSoftDelete(newSubject, 1)
+	result := testClient.GetSoftDeletedIDs()
+	expected := map[int64]map[string]int64{
+		10001: {newSubject: 1}}
 
-	go testClient.GetAllIDs(aChan)
-	result := <- aChan
+	testClient.PerformHardDelete(newSubject, 1)
+	assert.Equal(t, expected, result)
+}
+
+func TFilterIDs(t *testing.T) {
+
+	myIDs := map[int64]map[string]int64{
+		10001: {testingSubject: 1},
+		10002: {newSubject: 1},
+	}
+
+	// Test Allow lists
+	AllowList = StringArrayFlag{
+		newSubject: true,
+	}
+	DisallowList = nil
 
 	expected := map[int64]map[string]int64{
-		10001 : {testingSubject : 1}}
+		10002: {newSubject: 1},
+	}
 
-	assert.Equal(t, expected, result)
+	filtered := FilterIDs(myIDs)
+
+	assert.Equal(t, expected, filtered)
+
+	// Test DisAllow lists
+	AllowList = nil
+	DisallowList = StringArrayFlag{
+		newSubject: true,
+	}
+
+	myIDs = map[int64]map[string]int64{
+		10001: {testingSubject: 1},
+		10002: {newSubject: 1},
+	}
+
+	expected = map[int64]map[string]int64{
+		10001: {testingSubject: 1},
+	}
+
+	filtered = FilterIDs(myIDs)
+
+	assert.Equal(t, expected, filtered)
+
+	// Test Both
+	myIDs = map[int64]map[string]int64{
+		10001: {testingSubject: 1},
+		10002: {newSubject: 1},
+		10003: {"hello": 1},
+		10004: {"IAmSubject": 1},
+	}
+	AllowList = StringArrayFlag{
+		newSubject:     true,
+		testingSubject: true,
+		"hello":        true,
+	}
+	DisallowList = StringArrayFlag{
+		"hello": true,
+	}
+
+	// Expect hello to be disallowed
+	expected = map[int64]map[string]int64{
+		10001: {testingSubject: 1},
+		10002: {newSubject: 1},
+	}
+
+	filtered = FilterIDs(myIDs)
+
+	assert.Equal(t, expected, filtered)
+
+	AllowList = nil
+	DisallowList = nil
 }
 
-func TIsID(t *testing.T) {
-	aChan := make (chan idSubjectVersion)
-	var aGroup sync.WaitGroup
-
-	aGroup.Add(1)
-	go testClient.isID(10001, aChan, &aGroup)
-	result := <- aChan
-	expected := idSubjectVersion{Id: 10001, SubjectAndVersion : map[string]int64{testingSubject : 1}}
-	assert.Equal(t, expected, result)
-}
-
-func TFilterListedSubjects (t *testing.T) {
+func TFilterListedSubjects(t *testing.T) {
 	mySubjects := []string{testingSubject, newSubject}
 
 	// Test Allow lists
 	AllowList = StringArrayFlag{
-		newSubject : true,
+		newSubject: true,
 	}
 	DisallowList = nil
 
 	expected := map[string]bool{
-		newSubject : true,
+		newSubject: true,
 	}
 	assert.Equal(t, expected, filterListedSubjects(mySubjects))
 
 	// Test DisAllow lists
 	AllowList = nil
 	DisallowList = StringArrayFlag{
-		newSubject : true,
+		newSubject: true,
 	}
 
 	expected = map[string]bool{
-		testingSubject : true,
+		testingSubject: true,
 	}
 	assert.Equal(t, expected, filterListedSubjects(mySubjects))
 
 	// Test Both
 	mySubjects = []string{testingSubject, newSubject, "hello", "ImASubject"}
 	AllowList = StringArrayFlag{
-		newSubject : true,
-		testingSubject : true,
-		"hello" : true,
+		newSubject:     true,
+		testingSubject: true,
+		"hello":        true,
 	}
 	DisallowList = StringArrayFlag{
-		"hello" : true,
+		"hello": true,
 	}
 
 	// Expect hello to be disallowed
 	expected = map[string]bool{
-		newSubject : true,
-		testingSubject : true,
+		newSubject:     true,
+		testingSubject: true,
 	}
 	assert.Equal(t, expected, filterListedSubjects(mySubjects))
 
@@ -234,7 +286,7 @@ func TFilterListedSubjects (t *testing.T) {
 
 }
 
-func TFilterListedSubjectsVersions (t *testing.T) {
+func TFilterListedSubjectsVersions(t *testing.T) {
 	mySubjects := []SubjectVersion{
 		{newSubject, 1},
 		{testingSubject, 1},
@@ -242,7 +294,7 @@ func TFilterListedSubjectsVersions (t *testing.T) {
 
 	// Test Allow lists
 	AllowList = StringArrayFlag{
-		newSubject : true,
+		newSubject: true,
 	}
 	DisallowList = nil
 
@@ -252,7 +304,7 @@ func TFilterListedSubjectsVersions (t *testing.T) {
 	// Test DisAllow lists
 	AllowList = nil
 	DisallowList = StringArrayFlag{
-		newSubject : true,
+		newSubject: true,
 	}
 
 	expected = []SubjectVersion{{Subject: testingSubject, Version: 1}}
@@ -263,20 +315,20 @@ func TFilterListedSubjectsVersions (t *testing.T) {
 		{newSubject, 1},
 		{testingSubject, 1},
 		{"hello", 1},
-		{"ImASubject",1},
+		{"ImASubject", 1},
 	}
 
 	AllowList = StringArrayFlag{
-		newSubject : true,
-		testingSubject : true,
-		"hello" : true,
+		newSubject:     true,
+		testingSubject: true,
+		"hello":        true,
 	}
 	DisallowList = StringArrayFlag{
-		"hello" : true,
+		"hello": true,
 	}
 
 	// Expect hello to be disallowed, expect ImASubject to not be included regardless
-	expected = []SubjectVersion{{Subject: testingSubject, Version: 1},{Subject: newSubject, Version: 1}}
+	expected = []SubjectVersion{{Subject: testingSubject, Version: 1}, {Subject: newSubject, Version: 1}}
 	areEqual := compareSlices(expected, filterListedSubjectsVersions(mySubjects))
 	assert.True(t, areEqual)
 
@@ -287,36 +339,33 @@ func TFilterListedSubjectsVersions (t *testing.T) {
 
 func TPerformSoftDelete(t *testing.T) {
 	//Soft delete it
-	testClient.PerformSoftDelete(testingSubject,1)
+	testClient.PerformSoftDelete(testingSubject, 1)
 	//Check for it
-	checkIfSchemaRegistered := testClient.GetSchema(testingSubject,1)
+	checkIfSchemaRegistered := testClient.GetSchema(testingSubject, 1)
 	assert.Equal(t, "", checkIfSchemaRegistered.Schema)
 }
 
 func TPerformHardDelete(t *testing.T) {
 	//Hard delete it
-	testClient.PerformHardDelete(testingSubject,1)
+	testClient.PerformHardDelete(testingSubject, 1)
 
 	//Check if it is still an ID
-	aChan := make (chan map[int64]map[string]int64)
-	go testClient.GetAllIDs(aChan)
-	checkIfIDRegistered := <- aChan
+	checkIfIDRegistered := testClient.GetSoftDeletedIDs()
 	assert.Nil(t, checkIfIDRegistered[10001])
 }
 
-func TDeleteAllSubjectsPermanently (t *testing.T) {
+func TDeleteAllSubjectsPermanently(t *testing.T) {
 	/*
-	By testing:
-	GetSubjectsWithVersions
-	PerformSoftDelete
-	and PerformHardDelete
-	We inherently test this method.
-	 */
+		By testing:
+		GetSubjectsWithVersions
+		PerformSoftDelete
+		and PerformHardDelete
+		We inherently test this method.
+	*/
 	assert.True(t, true)
 }
 
-
-func setImportMode () {
+func setImportMode() {
 	if !testClient.IsImportModeReady() {
 		err := testClient.SetMode(IMPORT)
 		if err == false {
@@ -325,7 +374,7 @@ func setImportMode () {
 	}
 }
 
-func performQuery (req *http.Request) map[string]string {
+func performQuery(req *http.Request) map[string]string {
 	response := map[string]string{}
 
 	res, err := httpClient.Do(req)
@@ -337,7 +386,7 @@ func performQuery (req *http.Request) map[string]string {
 	if err != nil {
 		log.Printf(err.Error())
 	}
-	err = json.Unmarshal(body,&response)
+	err = json.Unmarshal(body, &response)
 	if err != nil {
 		log.Printf(err.Error())
 	}
@@ -346,7 +395,7 @@ func performQuery (req *http.Request) map[string]string {
 
 }
 
-func compareSlices (a, b []SubjectVersion) bool {
+func compareSlices(a, b []SubjectVersion) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -354,10 +403,10 @@ func compareSlices (a, b []SubjectVersion) bool {
 	sliceAMap := map[SubjectVersion]bool{}
 	sliceBMap := map[SubjectVersion]bool{}
 
-	for _ , val := range a {
+	for _, val := range a {
 		sliceAMap[val] = false
 	}
-	for _ , val := range b {
+	for _, val := range b {
 		sliceBMap[val] = false
 	}
 
