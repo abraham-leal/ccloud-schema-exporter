@@ -36,11 +36,12 @@ type RunMode int
 const (
 	SYNC RunMode = iota
 	BATCH
-	LOCAL
+	TOLOCAL
+	FROMLOCAL
 )
 
 func (r RunMode) String() string {
-	return [...]string{"SYNC", "BATCH", "LOCAL"}[r]
+	return [...]string{"SYNC", "BATCH", "TOLOCAL", "FROMLOCAL"}[r]
 }
 
 // Define Mode Enum

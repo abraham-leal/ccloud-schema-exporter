@@ -7,20 +7,10 @@ package client
 
 import (
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 func BatchExport(srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
-	// Listen for program interruption
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-sigs
-		log.Printf("Received %v signal, finishing current subject and quitting...", sig)
-		CancelRun = true
-	}()
+	listenForInterruption()
 
 	srcChan := make(chan map[string][]int64)
 	go srcClient.GetSubjectsWithVersions(srcChan)

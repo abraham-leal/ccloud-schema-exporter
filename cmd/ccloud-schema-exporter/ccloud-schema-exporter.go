@@ -23,6 +23,22 @@ func main() {
 
 	client.GetFlags()
 
+	if client.ThisRun == client.FROMLOCAL {
+		workingDir, err := os.Getwd()
+		if err != nil {
+			log.Fatalln("Could not get execution path. Possibly a permissions issue.")
+		}
+
+		destClient := client.NewSchemaRegistryClient(client.DestSRUrl, client.DestSRKey, client.DestSRSecret, "dst")
+
+		client.WriteFromFS(destClient, client.PathToWrite, workingDir)
+
+		log.Println("-----------------------------------------------")
+		log.Println("All Done! Thanks for using ccloud-schema-exporter!")
+
+		os.Exit(0)
+	}
+
 	srcClient := client.NewSchemaRegistryClient(client.SrcSRUrl, client.SrcSRKey, client.SrcSRSecret, "src")
 	if !srcClient.IsReachable() {
 		log.Fatalln("Could not reach source registry. Possible bad credentials?")
@@ -42,7 +58,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	if client.ThisRun == client.LOCAL {
+	if client.ThisRun == client.TOLOCAL {
 		workingDir, err := os.Getwd()
 		if err != nil {
 			log.Fatalln("Could not get execution path. Possibly a permissions issue.")

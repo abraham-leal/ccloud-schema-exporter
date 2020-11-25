@@ -3,17 +3,18 @@
 [![Build](https://travis-ci.com/abraham-leal/ccloud-schema-exporter.svg?branch=master)]() [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=abraham-leal_ccloud-schema-exporter&metric=alert_status)](https://sonarcloud.io/dashboard?id=abraham-leal_ccloud-schema-exporter)
 
 A tool to export schemas from a Confluent Cloud Schema Registry to another.
-This app supports three modes: `batchExport`, `sync`, and `getLocalCopy`.
+This app supports three modes: `batchExport`, `sync`, `getLocalCopy`, and `-fromLocalCopy`.
 
 - `batchExport` will do a one time migration between schema registries, then it will reset the destination registry to `READWRTIE` mode.
 - `sync` will continuously sync newly registered schemas into the destination registry.
 - `getLocalCopy` will fetch and write local copies of Schema Registry's Schemas.
+- `fromLocalCopy` will write schemas fetched by `getLocalCopy` to the destination Schema Registry.
 
 If you are looking to migrate schemas between On-Premise and Confluent Cloud, check out 
 [Confluent Replicator](https://docs.confluent.io/current/connect/kafka-connect-replicator/index.html).
 
 The exporter expects the following variables to be set in the environment to make the necessary calls:
-(In the case of `-getLocalCopy` and `-customDestination` it does not need `DST_*` variables)
+(In the case of `-getLocalCopy` and `-customDestination` it does not need `DST_*` variables; In the case of `-fromLocalCopy` it does not need `SRC_*` variables)
 
 - `SRC_SR_URL` : The URL for the source Schema Registry
 - `SRC_API_KEY` : The API KEY to be used to make calls to the source Schema Registry
@@ -56,12 +57,15 @@ However, for stable images tag a release.
 ## Run
 - `./ccloud-schema-exporter -batchExport` : Running the app with this flag will perform a batch export.
 - `./ccloud-schema-exporter -sync` : Running the app with this flag will start a continuous sync 
-between source and destination schema registries.
+between the source and destination schema registries.
 - `./ccloud-schema-exporter -getLocalCopy` : Running the app with this flag will get a snapshot of your Schema Registry
-into local files with naming structure subjectName-version-id per schema. The default directory is 
+into local files with naming structure subjectName-version-id-schemaType per schema. The default directory is 
 {currentPath}/SchemaRegistryBackup/.
+- `./ccloud-schema-exporter -fromLocalCopy` : Running the app with this flag will write schemas previously fetched. 
+It relies on the naming convention of `-getLocalCopy` to obtain the necessary metadata to register the schemas. 
+The default directory is {currentPath}/SchemaRegistryBackup/. The file lookup is recursive from the specified directory.
 
-When multiple flags are applied, prevalence is `sync` -> `batchExport` -> `getLocalCopy`
+When multiple flags are applied, prevalence is `sync` -> `batchExport` -> `getLocalCopy` -> `fromLocalCopy`
 
 NOTE: Given that the exporter cannot determine a per-subject compatibility rule, it is recommended to set the destination schema registry compatibility level to `NONE` on first sync and restore it to the source's level afterwards.
 
@@ -86,10 +90,12 @@ Usage of ./ccloud-schema-exporter:
     	Url to the Destination Schema Registry Cluster
   -disallowList value
     	A comma delimited list of schema subjects to disallow. It also accepts paths to a file containing a list of subjects.
+  -fromLocalCopy
+    	Registers all local schemas written by getLocalCopy. Defaults to a folder (SchemaRegistryBackup) in the current path of the binaries.
   -getLocalCopy
     	Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path of the binaries.
-  -getLocalCopyPath string
-    	Optional custom path for local copy. This must be an existing directory structure.
+  -localPath string
+    	Optional custom path for local functions. This must be an existing directory structure.
   -noPrompt
     	Set this flag to avoid checks while running. Assure you have the destination SR to correct Mode and Compatibility.
   -scrapeInterval int
@@ -123,12 +129,12 @@ export SRC_API_SECRET=XXXX
 export DST_SR_URL=XXXX
 export DST_API_KEY=XXXX
 export DST_API_SECRET=XXXX
-./ccloud-schema-exporter <-sync | -batchExport | -getLocalCopy>
+./ccloud-schema-exporter <-sync | -batchExport | -getLocalCopy | -fromLocalCopy>
 ````
 
 #### Filtering the export
 
-It is now possible to filter the subjects which are sync-ed in all modes (`<-sync | -batchExport | -getLocalCopy>`).
+It is now possible to filter the subjects which are sync-ed in all modes (`<-sync | -batchExport | -getLocalCopy | -fromLocalCopy>`).
 Setting `-allowList` or/and `-disallowList` flags will accept either a comma delimited string, or a file containing
 comma delimited entries for subject names (keep in mind these subjects must have their postfixes such as `-value` or 
 `-key` to match the topic schema).

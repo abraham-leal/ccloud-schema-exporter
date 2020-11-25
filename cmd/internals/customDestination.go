@@ -2,11 +2,8 @@ package client
 
 import (
 	"log"
-	"os"
-	"os/signal"
 	"reflect"
 	"strconv"
-	"syscall"
 	"time"
 )
 
@@ -17,14 +14,7 @@ func RunCustomDestinationSync(srcClient *SchemaRegistryClient, customDest Custom
 		log.Println(err)
 	}
 
-	// Listen for program interruption
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-sigs
-		log.Printf("Received %v signal, finishing current sync and quitting...", sig)
-		CancelRun = true
-	}()
+	listenForInterruption()
 
 	//Begin sync
 	for {
@@ -73,14 +63,7 @@ func RunCustomDestinationBatch(srcClient *SchemaRegistryClient, customDest Custo
 		log.Println(err)
 	}
 
-	// Listen for program interruption
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-sigs
-		log.Printf("Received %v signal, finishing current subject and quitting...", sig)
-		CancelRun = true
-	}()
+	listenForInterruption()
 
 	srcChan := make(chan map[string][]int64)
 	go srcClient.GetSubjectsWithVersions(srcChan)
