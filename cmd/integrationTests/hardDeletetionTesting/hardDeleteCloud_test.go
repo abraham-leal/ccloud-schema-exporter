@@ -105,24 +105,11 @@ func printIDTestResult(srcIDs map[int64]map[string]int64, dstIDs map[int64]map[s
 
 func testSoftDelete(t *testing.T, lenOfDestSubjects int) {
 
-	// Assert schemas in dest deep equal schemas in src
-	srcSubjects := make(map[string][]int64)
-	destSubjects := make(map[string][]int64)
-
-	srcChan := make(chan map[string][]int64)
-	destChan := make(chan map[string][]int64)
-
 	// inject a soft delete
 	testClientSrc.PerformSoftDelete(testingSubjectKey, 1)
 	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 
-	// Assert schemas in dest deep equal schemas in src
-
-	go testClientSrc.GetSubjectsWithVersions(srcChan)
-	go testClientDst.GetSubjectsWithVersions(destChan)
-
-	srcSubjects = <-srcChan
-	destSubjects = <-destChan
+	srcSubjects, destSubjects := getCurrentState()
 	printSubjectTestResult(srcSubjects, destSubjects)
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
@@ -132,17 +119,8 @@ func testSoftDelete(t *testing.T, lenOfDestSubjects int) {
 func testInitialSync(t *testing.T, lenOfDestSubjects int) {
 	log.Println("Testing initial sync")
 	// Assert schemas in dest deep equal schemas in src
-	srcSubjects := make(map[string][]int64)
-	destSubjects := make(map[string][]int64)
 
-	srcChan := make(chan map[string][]int64)
-	destChan := make(chan map[string][]int64)
-
-	go testClientSrc.GetSubjectsWithVersions(srcChan)
-	go testClientDst.GetSubjectsWithVersions(destChan)
-
-	srcSubjects = <-srcChan
-	destSubjects = <-destChan
+	srcSubjects, destSubjects := getCurrentState()
 
 	printSubjectTestResult(srcSubjects, destSubjects)
 
@@ -165,4 +143,21 @@ func testHardDeleteSync(t *testing.T, lenOfDestIDs int) {
 	assert.True(t, reflect.DeepEqual(srcIDs, dstIDs))
 	assert.True(t, len(dstIDs) == lenOfDestIDs)
 
+}
+
+func getCurrentState () (map[string][]int64, map[string][]int64) {
+
+	srcSubjects := make(map[string][]int64)
+	destSubjects := make(map[string][]int64)
+
+	srcChan := make(chan map[string][]int64)
+	destChan := make(chan map[string][]int64)
+
+	go testClientSrc.GetSubjectsWithVersions(srcChan)
+	go testClientDst.GetSubjectsWithVersions(destChan)
+
+	srcSubjects = <-srcChan
+	destSubjects = <-destChan
+
+	return srcSubjects,destSubjects
 }

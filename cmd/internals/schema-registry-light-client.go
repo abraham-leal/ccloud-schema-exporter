@@ -268,31 +268,18 @@ func (src *SchemaRegistryClient) GetSchema(subject string, version int64) Schema
 }
 
 func (src *SchemaRegistryClient) RegisterSchema(schema string, subject string, SType string) io.ReadCloser {
-	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl, subject)
-
-	schemaRequest := SchemaToRegister{Schema: schema, SType: SType}
-	schemaJSON, err := json.Marshal(schemaRequest)
-	if err != nil {
-		log.Printf(err.Error())
-	}
-
-	req := GetNewRequest("POST", endpoint, src.SRApiKey, src.SRApiSecret, bytes.NewReader(schemaJSON))
-
-	res, err := httpClient.Do(req)
-	if err != nil {
-		log.Printf(err.Error())
-		log.Println("Could not register schema!")
-		return nil
-	}
-	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
-
-	return res.Body
+	return src.RegisterSchemaBySubjectAndIDAndVersion(schema, subject, 0, 0, SType)
 }
 
 func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion(schema string, subject string, id int64, version int64, SType string) io.ReadCloser {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl, subject)
 
-	schemaRequest := SchemaToRegister{Schema: schema, Id: id, Version: version, SType: SType}
+	schemaRequest := SchemaToRegister{}
+	if id == 0 && version == 0 {
+		schemaRequest = SchemaToRegister{Schema: schema, SType: SType}
+	} else {
+		schemaRequest = SchemaToRegister{Schema: schema, Id: id, Version: version, SType: SType}
+	}
 	schemaJSON, err := json.Marshal(schemaRequest)
 	if err != nil {
 		log.Printf(err.Error())
@@ -386,7 +373,7 @@ func (src *SchemaRegistryClient) GetSoftDeletedIDs() map[int64]map[string]int64 
 		}
 	}
 
-	src.srcInMemDeletedIDs = FilterIDs(listHolder)
+	src.srcInMemDeletedIDs = filterIDs(listHolder)
 	return src.srcInMemDeletedIDs
 }
 
@@ -502,7 +489,7 @@ func filterListedSubjectsVersions(response []SubjectVersion) []SubjectVersion {
 	return subjectVersionSlice
 }
 
-func FilterIDs(candidate map[int64]map[string]int64) map[int64]map[string]int64 {
+func filterIDs(candidate map[int64]map[string]int64) map[int64]map[string]int64 {
 
 	for id, subjects := range candidate { // Filter out for allow lists
 		for sbj, _ := range subjects {

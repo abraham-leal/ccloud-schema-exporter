@@ -185,7 +185,7 @@ func TFilterIDs(t *testing.T) {
 		10002: {newSubject: 1},
 	}
 
-	filtered := FilterIDs(myIDs)
+	filtered := filterIDs(myIDs)
 
 	assert.Equal(t, expected, filtered)
 
@@ -204,7 +204,7 @@ func TFilterIDs(t *testing.T) {
 		10001: {testingSubject: 1},
 	}
 
-	filtered = FilterIDs(myIDs)
+	filtered = filterIDs(myIDs)
 
 	assert.Equal(t, expected, filtered)
 
@@ -230,7 +230,7 @@ func TFilterIDs(t *testing.T) {
 		10002: {newSubject: 1},
 	}
 
-	filtered = FilterIDs(myIDs)
+	filtered = filterIDs(myIDs)
 
 	assert.Equal(t, expected, filtered)
 

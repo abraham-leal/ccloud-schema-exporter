@@ -33,20 +33,7 @@ func Sync(srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
 		}
 		beginSync := time.Now()
 
-		srcSubjects := make(map[string][]int64)
-		destSubjects := make(map[string][]int64)
-
-		srcChan := make(chan map[string][]int64)
-		destChan := make(chan map[string][]int64)
-
-		go srcClient.GetSubjectsWithVersions(srcChan)
-		go destClient.GetSubjectsWithVersions(destChan)
-
-		srcSubjects = <-srcChan
-		destSubjects = <-destChan
-
-		log.Println(srcSubjects)
-		log.Println(destSubjects)
+		srcSubjects, destSubjects := getCurrentSubjectsStates(srcClient, destClient)
 
 		if !reflect.DeepEqual(srcSubjects, destSubjects) {
 			diff := GetSubjectDiff(srcSubjects, destSubjects)
@@ -104,7 +91,7 @@ func syncSoftDeletes(destSubjects map[string][]int64, srcSubjects map[string][]i
 }
 
 func syncHardDeletes(srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
-	permDel := getPermanentlyDeletedSchemas(srcClient, destClient)
+	permDel := getIDDiff(srcClient.GetSoftDeletedIDs(), destClient.GetSoftDeletedIDs())
 	if len(permDel) != 0 {
 		for id, subjectVersionMap := range permDel {
 			for subject, version := range subjectVersionMap {
@@ -148,10 +135,6 @@ func GetVersionsDiff(a1 []int64, a2 []int64) []int64 {
 	return diff
 }
 
-func getPermanentlyDeletedSchemas(src *SchemaRegistryClient, dest *SchemaRegistryClient) map[int64]map[string]int64 {
-	return getIDDiff(src.GetSoftDeletedIDs(), dest.GetSoftDeletedIDs())
-}
-
 func getIDDiff(m1 map[int64]map[string]int64, m2 map[int64]map[string]int64) map[int64]map[string]int64 {
 	diffMap := map[int64]map[string]int64{}
 
@@ -174,4 +157,21 @@ func getIDDiff(m1 map[int64]map[string]int64, m2 map[int64]map[string]int64) map
 	}
 
 	return diffMap
+}
+
+func getCurrentSubjectsStates(srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) (map[string][]int64, map[string][]int64) {
+
+	srcSubjects := make(map[string][]int64)
+	destSubjects := make(map[string][]int64)
+
+	srcChan := make(chan map[string][]int64)
+	destChan := make(chan map[string][]int64)
+
+	go srcClient.GetSubjectsWithVersions(srcChan)
+	go destClient.GetSubjectsWithVersions(destChan)
+
+	srcSubjects = <-srcChan
+	destSubjects = <-destChan
+
+	return srcSubjects,destSubjects
 }
