@@ -51,11 +51,18 @@ func WriteFromFS(dstClient *SchemaRegistryClient, definedPath string, workingDir
 		})
 	check(err)
 
-	log.Println("Destination Schema Registry Fully Restored From Backup")
+	if CancelRun != true {
+		log.Println("Destination Schema Registry Fully Restored From Backup")
+	} else {
+		log.Println("Destination Schema Registry Partially Restored From Backup")
+	}
 }
 
 // Writes the provided file to Schema Registry
 func writeSchemaToSR(dstClient *SchemaRegistryClient, filepath string) {
+	if CancelRun == true {
+		return
+	}
 	id, version, subject, stype := parseFileName(filepath)
 	if len(AllowList) != 0 {
 		_, isAllowed := AllowList[subject]
