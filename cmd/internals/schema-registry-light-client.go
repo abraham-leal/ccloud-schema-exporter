@@ -25,6 +25,8 @@ All functions are methods of SchemaRegistryClient
 
 var statusError = "Received status code %d instead of 200 for %s, on %s"
 
+// Base construct of a Schema Registry Client.
+// The target parameter will decide what checks will be performed in the environment variables
 func NewSchemaRegistryClient(SR string, apiKey string, apiSecret string, target string) *SchemaRegistryClient {
 	client := SchemaRegistryClient{}
 
@@ -48,6 +50,7 @@ func NewSchemaRegistryClient(SR string, apiKey string, apiSecret string, target 
 	return &client
 }
 
+// Returns whether a proper connection could be made to the Schema Registry by the client
 func (src *SchemaRegistryClient) IsReachable() bool {
 	endpoint := src.SRUrl
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
@@ -64,6 +67,7 @@ func (src *SchemaRegistryClient) IsReachable() bool {
 	}
 }
 
+// Returns all non-deleted (soft or hard deletions) subjects with their versions in the form of a map.
 func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan<- map[string][]int64) {
 	src.InMemSchemas = make(map[string][]int64)
 	endpoint := fmt.Sprintf("%s/subjects", src.SRUrl)
@@ -125,6 +129,7 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan<- map[string
 	chanY <- src.InMemSchemas
 }
 
+// Returns all non-deleted versions (soft or hard deleted) that exist for a given subject.
 func (src *SchemaRegistryClient) GetVersions(subject string, chanX chan<- SubjectWithVersions, wg *sync.WaitGroup) {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl, subject)
 	defer wg.Done()
@@ -159,6 +164,7 @@ func (src *SchemaRegistryClient) GetVersions(subject string, chanX chan<- Subjec
 	chanX <- pkgSbj
 }
 
+// Performs a check to see if the compatibility level for the backing Schema Registry is set to NONE
 func (src *SchemaRegistryClient) IsCompatReady() bool {
 	response, ok := handleEndpointQuery("config", src)
 	if !ok {
@@ -172,6 +178,7 @@ func (src *SchemaRegistryClient) IsCompatReady() bool {
 	}
 }
 
+// Allows to set a compatibility level for the backing Schema Registry, returns true if successful
 func (src *SchemaRegistryClient) SetGlobalCompatibility(comptToSet Compatibility) bool {
 	endpoint := fmt.Sprintf("%s/config", src.SRUrl)
 
@@ -199,6 +206,7 @@ func (src *SchemaRegistryClient) SetGlobalCompatibility(comptToSet Compatibility
 
 }
 
+// Performs a check on the backing Schema Registry to see if it is in global IMPORT mode.
 func (src *SchemaRegistryClient) IsImportModeReady() bool {
 	response, ok := handleEndpointQuery("mode", src)
 	if !ok {
@@ -212,6 +220,7 @@ func (src *SchemaRegistryClient) IsImportModeReady() bool {
 	}
 }
 
+// Allows to set a global mode for the backing Schema Registry
 func (src *SchemaRegistryClient) SetMode(modeToSet Mode) bool {
 	endpoint := fmt.Sprintf("%s/mode", src.SRUrl)
 
@@ -239,6 +248,7 @@ func (src *SchemaRegistryClient) SetMode(modeToSet Mode) bool {
 
 }
 
+// Returns a SchemaRecord for the given subject and version by querying the backing Schema Registry
 func (src *SchemaRegistryClient) GetSchema(subject string, version int64) SchemaRecord {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d", src.SRUrl, subject, version)
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
@@ -267,10 +277,12 @@ func (src *SchemaRegistryClient) GetSchema(subject string, version int64) Schema
 	return SchemaRecord{Subject: schemaResponse.Subject, Schema: schemaResponse.Schema, Version: schemaResponse.Version, Id: schemaResponse.Id, SType: schemaResponse.SType}.setTypeIfEmpty()
 }
 
+// Registers a schema
 func (src *SchemaRegistryClient) RegisterSchema(schema string, subject string, SType string) io.ReadCloser {
 	return src.RegisterSchemaBySubjectAndIDAndVersion(schema, subject, 0, 0, SType)
 }
 
+// Registers a schema with the given SchemaID and SchemaVersion
 func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion(schema string, subject string, id int64, version int64, SType string) io.ReadCloser {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl, subject)
 
@@ -298,7 +310,8 @@ func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion(schema s
 	return res.Body
 }
 
-// Deletes all schemas in the registry
+// Deletes all schemas in the backing Schema Registry
+// This method does not respect AllowList or DisallowList
 func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently() {
 	destSubjects := make(map[string][]int64)
 	destChan := make(chan map[string][]int64)
@@ -327,6 +340,7 @@ func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently() {
 	}
 }
 
+// Performs a Soft Delete on the given subject and version on the backing Schema Registry
 func (src *SchemaRegistryClient) PerformSoftDelete(subject string, version int64) bool {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d", src.SRUrl, subject, version)
 	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret, nil)
@@ -336,9 +350,11 @@ func (src *SchemaRegistryClient) PerformSoftDelete(subject string, version int64
 		return false
 	}
 
-	return handleDeletes(res.Body, res.StatusCode, req.Method, endpoint, "Soft", subject, version)
+	return handleDeletesHTTPResponse(res.Body, res.StatusCode, req.Method, endpoint, "Soft", subject, version)
 }
 
+// Performs a Hard Delete on the given subject and version on the backing Schema Registry
+// NOTE: A Hard Delete should only be performed after a soft delete
 func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int64) bool {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d?permanent=true", src.SRUrl, subject, version)
 	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret, nil)
@@ -348,9 +364,10 @@ func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int64
 		return false
 	}
 
-	return handleDeletes(res.Body, res.StatusCode, req.Method, endpoint, "Hard", subject, version)
+	return handleDeletesHTTPResponse(res.Body, res.StatusCode, req.Method, endpoint, "Hard", subject, version)
 }
 
+// Returns a map with the [ID][Subject:Version] state of the backing Schema Registry for only the soft deleted SubjectVersions
 func (src *SchemaRegistryClient) GetSoftDeletedIDs() map[int64]map[string]int64 {
 	src.srcInMemDeletedIDs = map[int64]map[string]int64{} // Map of ID -> (Map of subject -> Version)
 
@@ -377,6 +394,8 @@ func (src *SchemaRegistryClient) GetSoftDeletedIDs() map[int64]map[string]int64 
 	return src.srcInMemDeletedIDs
 }
 
+// Returns a dump of all Schemas mapped to their IDs from the backing Schema Registry
+// The parameter specifies whether to show soft deleted schemas as well
 func (src SchemaRegistryClient) getSchemaList(deleted bool) map[int64]SchemaExtraction {
 
 	endpoint := fmt.Sprintf("%s/schemas?deleted=%v", src.SRUrl, deleted)
@@ -406,136 +425,4 @@ func (src SchemaRegistryClient) getSchemaList(deleted bool) map[int64]SchemaExtr
 	}
 
 	return responseMap
-}
-
-func handleDeletes(body io.Reader, statusCode int, method string, endpoint string,
-	reqType string, subject string, version int64) bool {
-	if statusCode != 200 {
-		body, _ := ioutil.ReadAll(body)
-		errorMsg := fmt.Sprintf(statusError, statusCode, method, endpoint)
-		log.Printf("ERROR: %s, HTTP Response: %s", errorMsg, string(body))
-	} else {
-		log.Println(fmt.Sprintf("%s deleted subject: %s, version: %d", reqType, subject, version))
-		return true
-	}
-	return false
-}
-
-func handleNotSuccess(body io.Reader, statusCode int, method string, endpoint string) {
-	if statusCode != 200 {
-		body, _ := ioutil.ReadAll(body)
-		errorMsg := fmt.Sprintf(statusError, statusCode, method, endpoint)
-		log.Printf("ERROR: %s, HTTP Response: %s", errorMsg, string(body))
-	}
-}
-
-func filterListedSubjects(response []string) map[string]bool {
-	// Start allow list work
-	subjectMap := map[string]bool{}
-
-	for _, s := range response { // Generate a map of subjects for easier manipulation
-		subjectMap[s] = true
-	}
-
-	for s, _ := range subjectMap { // Filter out for allow lists
-		if AllowList != nil { // If allow list is defined
-			_, allowContains := AllowList[s]
-			if !allowContains { // If allow list does not contain it, delete it
-				delete(subjectMap, s)
-			}
-		}
-		if DisallowList != nil { // If disallow list is defined
-			_, disallowContains := DisallowList[s]
-			if disallowContains { // If disallow list contains it, delete it
-				delete(subjectMap, s)
-			}
-		}
-	}
-
-	return subjectMap
-}
-
-func filterListedSubjectsVersions(response []SubjectVersion) []SubjectVersion {
-	subjectMap := map[string]int64{}
-
-	for _, s := range response { // Generate a map of subjects for easier manipulation
-		subjectMap[s.Subject] = s.Version
-	}
-
-	for s, _ := range subjectMap { // Filter out for allow lists
-		if AllowList != nil { // If allow list is defined
-			_, allowContains := AllowList[s]
-			if !allowContains { // If allow list does not contain it, delete it
-				delete(subjectMap, s)
-			}
-		}
-		if DisallowList != nil { // If disallow list is defined
-			_, disallowContains := DisallowList[s]
-			if disallowContains { // If disallow list contains it, delete it
-				delete(subjectMap, s)
-			}
-		}
-	}
-
-	subjectVersionSlice := []SubjectVersion{}
-	for s, v := range subjectMap {
-		tempSubjVer := SubjectVersion{
-			Subject: s,
-			Version: v,
-		}
-		subjectVersionSlice = append(subjectVersionSlice, tempSubjVer)
-	}
-
-	return subjectVersionSlice
-}
-
-func filterIDs(candidate map[int64]map[string]int64) map[int64]map[string]int64 {
-
-	for id, subjects := range candidate { // Filter out for allow lists
-		for sbj, _ := range subjects {
-			if AllowList != nil { // If allow list is defined
-				_, allowContains := AllowList[sbj]
-				if !allowContains { // If allow list does not contain it, delete it
-					delete(candidate[id], sbj)
-				}
-			}
-			if DisallowList != nil { // If disallow list is defined
-				_, disallowContains := DisallowList[sbj]
-				if disallowContains { // If disallow list contains it, delete it
-					delete(candidate[id], sbj)
-				}
-			}
-		}
-		if len(subjects) == 0 {
-			delete(candidate, id)
-		}
-	}
-
-	return candidate
-}
-
-func handleEndpointQuery(end string, src *SchemaRegistryClient) (map[string]string, bool) {
-	endpoint := fmt.Sprintf("%s/%s", src.SRUrl, end)
-	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
-
-	res, err := httpClient.Do(req)
-	if err != nil {
-		log.Printf(err.Error())
-		return nil, false
-	}
-	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
-
-	response := map[string]string{}
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.Printf(err.Error())
-		return nil, false
-	}
-
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		log.Printf(err.Error())
-	}
-	return response, true
 }

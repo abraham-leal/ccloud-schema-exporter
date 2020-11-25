@@ -42,6 +42,7 @@ func WriteToFS(srcClient *SchemaRegistryClient, definedPath string, workingDirec
 	aGroup.Wait()
 }
 
+// Writes the provided schema in the given path
 func writeSchema(srcClient *SchemaRegistryClient, pathToWrite string, subject string, version int64, wg *sync.WaitGroup) {
 	rawSchema := srcClient.GetSchema(subject, version)
 	defer wg.Done()
@@ -63,6 +64,7 @@ func writeSchema(srcClient *SchemaRegistryClient, pathToWrite string, subject st
 	_ = f.Sync()
 }
 
+// Returns a valid local FS path to write the schemas to
 func CheckPath(definedPath string, workingDirectory string) string {
 
 	currentPath := filepath.Clean(workingDirectory)
@@ -87,11 +89,5 @@ func CheckPath(definedPath string, workingDirectory string) string {
 			}
 		}
 		return definedPath
-	}
-}
-
-func check(e error) {
-	if e != nil {
-		panic(e)
 	}
 }
