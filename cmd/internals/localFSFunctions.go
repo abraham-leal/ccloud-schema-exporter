@@ -132,7 +132,7 @@ func CheckPath(definedPath string, workingDirectory string) string {
 
 	if definedPath == "" {
 		definedPath = filepath.Join(currentPath, "SchemaRegistryBackup")
-		log.Println("Path not defined, writing to new local folder SchemaRegistryBackup")
+		log.Println("Path not defined, using local folder SchemaRegistryBackup")
 		_ = os.Mkdir(definedPath, 0755)
 		return definedPath
 	} else {
