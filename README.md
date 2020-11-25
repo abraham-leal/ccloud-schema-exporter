@@ -90,10 +90,12 @@ Usage of ./ccloud-schema-exporter:
     	Url to the Destination Schema Registry Cluster
   -disallowList value
     	A comma delimited list of schema subjects to disallow. It also accepts paths to a file containing a list of subjects.
+  -fromLocalCopy
+    	Registers all local schemas written by getLocalCopy. Defaults to a folder (SchemaRegistryBackup) in the current path of the binaries.
   -getLocalCopy
     	Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path of the binaries.
-  -getLocalCopyPath string
-    	Optional custom path for local copy. This must be an existing directory structure.
+  -localPath string
+    	Optional custom path for local functions. This must be an existing directory structure.
   -noPrompt
     	Set this flag to avoid checks while running. Assure you have the destination SR to correct Mode and Compatibility.
   -scrapeInterval int
