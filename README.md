@@ -143,7 +143,7 @@ NOTE: Lists aren't respected with the utility `-deleteAllFromDestination`
 As of v1.1, `ccloud-schema-exporter` provides an efficient way of syncing hard deletions.
 In previous versions, this was done through inefficient lookups.
 
-Support for syncing hard deletions is only applicable when the source is a Confluent Cloud Schema Registry.
+Support for syncing hard deletions is only when the source and destination are both a Confluent Cloud Schema Registry.
 
 #### Non-Interactive Run
 
@@ -152,8 +152,9 @@ However, it does include some checks to assure things go smoothly in the replica
 You can disable these checks by setting the configuration `-noPrompt`.
 By default, the docker image has this in its entry point.
 
-There are two checks made:
+There are three checks made:
 - The destination schema registry is in `IMPORT` mode. This is a requirement, otherwise the replication won't work.
+- When syncing hard deletions, both clusters are Confluent Cloud Schema Registries. This is a requirement.
 - The destination schema registry is in `NONE` global compatibility mode.
 This is not a requirement, but suggested since per-subject compatibility rules cannot be determined per version.
 Not setting this may result in some versions not being able to be registered since they do not adhere to the global compatibility mode.

@@ -121,6 +121,27 @@ func main() {
 		}
 	}
 
+	if (!strings.HasSuffix(srcClient.SRUrl, "confluent.cloud") ||
+		!strings.HasSuffix(destClient.SRUrl, "confluent.cloud")) &&
+		client.ThisRun == client.SYNC && client.SyncHardDeletes && !client.NoPrompt {
+
+		fmt.Println("It looks like you are trying to sync hard deletions between non-Confluent Cloud Schema Registries")
+		fmt.Println("Starting v1.1, ccloud-schema-exporter only supports hard deletion sync between Confluent Cloud Schema Registries")
+		fmt.Println("------------------------------------------------------")
+		fmt.Println("Do you wish to continue? (Y/n)")
+
+		var text string
+
+		_, err := fmt.Scanln(&text)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if !strings.EqualFold(text, "Y") {
+			os.Exit(0)
+		}
+	}
+
 	if client.ThisRun == client.SYNC {
 		client.Sync(srcClient, destClient)
 	}
