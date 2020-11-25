@@ -12,12 +12,22 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 // Simple check function that will panic if there is an error present
 func check(e error) {
 	if e != nil {
 		panic(e)
+	}
+}
+
+// Simple check function that will not fail and log if there is an error present
+func checkDontFail(e error) {
+	if e != nil {
+		log.Println(e)
 	}
 }
 
@@ -249,19 +259,28 @@ func getIDDiff(m1 map[int64]map[string]int64, m2 map[int64]map[string]int64) map
 }
 
 // Returns the currently registered subjects for the SR clients provided
-func getCurrentSubjectsStates(srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) (map[string][]int64, map[string][]int64) {
+func GetCurrentSubjectsStates(srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) (map[string][]int64, map[string][]int64) {
+	return GetCurrentSubjectState(srcClient), GetCurrentSubjectState(destClient)
+}
 
-	srcSubjects := make(map[string][]int64)
-	destSubjects := make(map[string][]int64)
+// Returns the currently registered subjects for the single SR provided
+func GetCurrentSubjectState(client *SchemaRegistryClient) map[string][]int64 {
+	subjects := make(map[string][]int64)
+	aChan := make(chan map[string][]int64)
 
-	srcChan := make(chan map[string][]int64)
-	destChan := make(chan map[string][]int64)
+	go client.GetSubjectsWithVersions(aChan)
 
-	go srcClient.GetSubjectsWithVersions(srcChan)
-	go destClient.GetSubjectsWithVersions(destChan)
+	subjects = <-aChan
+	return subjects
+}
 
-	srcSubjects = <-srcChan
-	destSubjects = <-destChan
-
-	return srcSubjects,destSubjects
+// Listens for user-provided controlled exit, and terminated the current process
+func listenForInterruption() {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		sig := <-sigs
+		log.Printf("Received %v signal, quitting non-started schema writes...", sig)
+		CancelRun = true
+	}()
 }

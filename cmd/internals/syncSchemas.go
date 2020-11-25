@@ -7,24 +7,14 @@ package client
 
 import (
 	"log"
-	"os"
-	"os/signal"
 	"reflect"
 	"strconv"
-	"syscall"
 	"time"
 )
 
 func Sync(srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
 
-	// Listen for program interruption
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-sigs
-		log.Printf("Received %v signal, finishing current sync and quitting...", sig)
-		CancelRun = true
-	}()
+	listenForInterruption()
 
 	//Begin sync
 	for {
@@ -33,7 +23,7 @@ func Sync(srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
 		}
 		beginSync := time.Now()
 
-		srcSubjects, destSubjects := getCurrentSubjectsStates(srcClient, destClient)
+		srcSubjects, destSubjects := GetCurrentSubjectsStates(srcClient, destClient)
 
 		if !reflect.DeepEqual(srcSubjects, destSubjects) {
 			diff := GetSubjectDiff(srcSubjects, destSubjects)

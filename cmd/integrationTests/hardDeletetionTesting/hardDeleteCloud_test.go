@@ -145,7 +145,7 @@ func testHardDeleteSync(t *testing.T, lenOfDestIDs int) {
 
 }
 
-func getCurrentState () (map[string][]int64, map[string][]int64) {
+func getCurrentState() (map[string][]int64, map[string][]int64) {
 
 	srcSubjects := make(map[string][]int64)
 	destSubjects := make(map[string][]int64)
@@ -159,5 +159,5 @@ func getCurrentState () (map[string][]int64, map[string][]int64) {
 	srcSubjects = <-srcChan
 	destSubjects = <-destChan
 
-	return srcSubjects,destSubjects
+	return srcSubjects, destSubjects
 }

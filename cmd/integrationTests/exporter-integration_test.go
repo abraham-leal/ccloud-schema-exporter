@@ -359,6 +359,7 @@ func testLocalCopy(t *testing.T, expectedFilesToWrite int) {
 
 	currentPath, _ := os.Getwd()
 	currentPath = filepath.Clean(currentPath)
+	testClientDst.DeleteAllSubjectsPermanently()
 
 	// Test Relative Paths
 	err := os.Mkdir(currentPath+localRelativePath, 0755)
@@ -368,21 +369,33 @@ func testLocalCopy(t *testing.T, expectedFilesToWrite int) {
 
 	defer os.RemoveAll(currentPath + localRelativePath)
 	client.WriteToFS(testClientSrc, "testingLocalBackupRelativePath", currentPath)
+	client.WriteFromFS(testClientDst, "testingLocalBackupRelativePath", currentPath)
 
 	files, err2 := ioutil.ReadDir(currentPath + localRelativePath)
 	if err2 != nil {
 		panic(err2)
 	}
 
+	dstSubj := client.GetCurrentSubjectState(testClientDst)
+	testClientDst.DeleteAllSubjectsPermanently()
+
+	assert.True(t, len(dstSubj) == expectedFilesToWrite/3)
+	assert.True(t, len(files) == expectedFilesToWrite)
+
 	// Test Absolute Paths
 	_ = os.Mkdir(localAbsPath, 0755)
 	defer os.RemoveAll(localAbsPath)
 	client.WriteToFS(testClientSrc, localAbsPath, currentPath)
+	client.WriteFromFS(testClientDst, localAbsPath, currentPath)
+
+	dstSubj = client.GetCurrentSubjectState(testClientDst)
+	testClientDst.DeleteAllSubjectsPermanently()
 
 	files2, _ := ioutil.ReadDir(localAbsPath)
 
+	assert.True(t, len(dstSubj) == expectedFilesToWrite/3)
 	assert.True(t, len(files2) == expectedFilesToWrite)
-	assert.True(t, len(files) == expectedFilesToWrite)
+
 }
 
 func commonSyncTest(t *testing.T, lenOfDestSubjects int) {
