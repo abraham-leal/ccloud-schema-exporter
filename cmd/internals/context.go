@@ -63,7 +63,7 @@ func GetFlags() {
 
 	if *deleteFlag {
 		log.Println("Deleting all schemas from DESTINATION registry")
-		deleteAll(DestSRUrl, DestSRKey, DestSRSecret)
+		deleteAllFromDestination(DestSRUrl, DestSRKey, DestSRSecret)
 		os.Exit(0)
 	}
 
@@ -87,13 +87,4 @@ func GetFlags() {
 		ThisRun = SYNC
 	}
 
-}
-
-func printVersion() {
-	fmt.Printf("ccloud-schema-exporter: %s\n", Version)
-}
-
-func deleteAll(sr string, key string, secret string) {
-	destClient := NewSchemaRegistryClient(sr, key, secret, "dst")
-	destClient.DeleteAllSubjectsPermanently()
 }

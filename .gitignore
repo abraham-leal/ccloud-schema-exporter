@@ -2,4 +2,5 @@
 .env
 ccloud-schema-exporter
 export_env.sh
+export_env_cclouds.sh
 cmd/ccloud-schema-exporter/ccloud-schema-exporter
