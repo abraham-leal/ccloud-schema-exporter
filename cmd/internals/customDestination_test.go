@@ -9,8 +9,8 @@ import (
 
 func TestMainStackCustomDestination(t *testing.T) {
 	setup()
-	t.Run("TCustomDestinationBatch", func(t *testing.T) {TCustomDestinationBatch(t)})
-	t.Run("TCustomDestinationSync", func(t *testing.T) {TCustomDestinationSync(t)})
+	t.Run("TCustomDestinationBatch", func(t *testing.T) { TCustomDestinationBatch(t) })
+	t.Run("TCustomDestinationSync", func(t *testing.T) { TCustomDestinationSync(t) })
 	tearDown()
 }
 

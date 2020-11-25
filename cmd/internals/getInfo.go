@@ -32,7 +32,6 @@ func SrcGetAPISecret() string {
 	panic(errors.New("SRC_API_SECRET environment variable has not been specified"))
 }
 
-
 // SrcGetSRUrl returns the Source URL from environment variables
 // if an API Key can not be found, it exits the process
 func SrcGetSRUrl() string {
@@ -65,7 +64,6 @@ func DestGetAPISecret() string {
 
 	panic(errors.New("DST_API_SECRET environment variable has not been specified"))
 }
-
 
 // DestGetSRUrl returns the Destination URL from environment variables
 // if an API Key can not be found, it exits the process

@@ -90,8 +90,6 @@ Usage of ./ccloud-schema-exporter:
     	Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path of the binaries.
   -getLocalCopyPath string
     	Optional custom path for local copy. This must be an existing directory structure.
-  -lowerBound int
-    	Lower SR ID space bound (default 100000)
   -noPrompt
     	Set this flag to avoid checks while running. Assure you have the destination SR to correct Mode and Compatibility.
   -scrapeInterval int
@@ -110,8 +108,6 @@ Usage of ./ccloud-schema-exporter:
     	Setting this will sync hard deletes from the source cluster to the destination
   -timeout int
     	Timeout, in seconds, to use for all REST calls with the Schema Registries (default 60)
-  -upperBound int
-    	Upper SR ID space bound (default 101000)
   -usage
     	Print the usage of this tool
   -version
@@ -144,15 +140,10 @@ NOTE: Lists aren't respected with the utility `-deleteAllFromDestination`
 
 #### A note on syncing hard deletions
 
-Confluent Schema Registry does not provide a good way to discover the full space of IDs registered.
-Due to this, we do inefficient discovery of schema IDs. 
-This means we have to assume Schema Registry IDs in the source and destiny SRs are within a range. 
-By default, this range is 100,000 to 101,000. (The default start and limit in Confluent Cloud)
-This range is tunable by setting `-lowerBound` and `-upperBound` together with enabling hard deletion sync with `-syncHardDeletes`.
+As of v1.1, `ccloud-schema-exporter` provides an efficient way of syncing hard deletions.
+In previous versions, this was done through inefficient lookups.
 
-Keep in mind syncing hard deletes does have a performance penalty on the sync. 
-Getting the latest snapshot of the state is an expensive operation.
-You can expect about a 2-second increase in sync time.
+Support for syncing hard deletions is only when the source and destination are both a Confluent Cloud Schema Registry.
 
 #### Non-Interactive Run
 
@@ -161,8 +152,9 @@ However, it does include some checks to assure things go smoothly in the replica
 You can disable these checks by setting the configuration `-noPrompt`.
 By default, the docker image has this in its entry point.
 
-There are two checks made:
+There are three checks made:
 - The destination schema registry is in `IMPORT` mode. This is a requirement, otherwise the replication won't work.
+- When syncing hard deletions, both clusters are Confluent Cloud Schema Registries. This is a requirement.
 - The destination schema registry is in `NONE` global compatibility mode.
 This is not a requirement, but suggested since per-subject compatibility rules cannot be determined per version.
 Not setting this may result in some versions not being able to be registered since they do not adhere to the global compatibility mode.

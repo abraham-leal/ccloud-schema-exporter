@@ -15,7 +15,7 @@ import (
 	"syscall"
 )
 
-func WriteToFS (srcClient *SchemaRegistryClient, definedPath string, workingDirectory string) {
+func WriteToFS(srcClient *SchemaRegistryClient, definedPath string, workingDirectory string) {
 	// Listen for program interruption
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -29,12 +29,12 @@ func WriteToFS (srcClient *SchemaRegistryClient, definedPath string, workingDire
 
 	srcChan := make(chan map[string][]int64)
 	go srcClient.GetSubjectsWithVersions(srcChan)
-	srcSubjects := <- srcChan
+	srcSubjects := <-srcChan
 	var aGroup sync.WaitGroup
 
 	log.Printf("Writing all schemas from %s to path %s", srcClient.SRUrl, definedPath)
-	for srcSubject , srcVersions := range srcSubjects {
-		for _ , v := range srcVersions {
+	for srcSubject, srcVersions := range srcSubjects {
+		for _, v := range srcVersions {
 			aGroup.Add(1)
 			go writeSchema(srcClient, definedPath, srcSubject, v, &aGroup)
 		}
@@ -42,19 +42,18 @@ func WriteToFS (srcClient *SchemaRegistryClient, definedPath string, workingDire
 	aGroup.Wait()
 }
 
-func writeSchema (srcClient *SchemaRegistryClient, pathToWrite string, subject string, version int64, wg *sync.WaitGroup) {
-	rawSchema := srcClient.GetSchema(subject,version)
+func writeSchema(srcClient *SchemaRegistryClient, pathToWrite string, subject string, version int64, wg *sync.WaitGroup) {
+	rawSchema := srcClient.GetSchema(subject, version)
 	defer wg.Done()
 	if CancelRun == true {
 		return
 	}
 
-
 	log.Printf("Writing schema: %s with version: %d and ID: %d",
 		rawSchema.Subject, rawSchema.Version, rawSchema.Id)
 
-	filename := fmt.Sprintf("%s-%d-%d",rawSchema.Subject, rawSchema.Version, rawSchema.Id)
-	f , err := os.Create(filepath.Join(pathToWrite,filename))
+	filename := fmt.Sprintf("%s-%d-%d", rawSchema.Subject, rawSchema.Version, rawSchema.Id)
+	f, err := os.Create(filepath.Join(pathToWrite, filename))
 
 	check(err)
 	defer f.Close()
@@ -64,7 +63,7 @@ func writeSchema (srcClient *SchemaRegistryClient, pathToWrite string, subject s
 	_ = f.Sync()
 }
 
-func CheckPath (definedPath string, workingDirectory string) string {
+func CheckPath(definedPath string, workingDirectory string) string {
 
 	currentPath := filepath.Clean(workingDirectory)
 
@@ -74,13 +73,13 @@ func CheckPath (definedPath string, workingDirectory string) string {
 		_ = os.Mkdir(definedPath, 0755)
 		return definedPath
 	} else {
-		if filepath.IsAbs(definedPath){
+		if filepath.IsAbs(definedPath) {
 			if _, err := os.Stat(definedPath); os.IsNotExist(err) {
 				log.Println("Path: " + definedPath)
 				log.Fatalln("The directory specified does not exist.")
 			}
 		} else {
-			definedPath = filepath.Join(currentPath,definedPath)
+			definedPath = filepath.Join(currentPath, definedPath)
 			_, err := os.Stat(definedPath)
 			if os.IsNotExist(err) {
 				log.Println("Path: " + definedPath)
@@ -91,7 +90,7 @@ func CheckPath (definedPath string, workingDirectory string) string {
 	}
 }
 
-func check (e error){
+func check(e error) {
 	if e != nil {
 		panic(e)
 	}

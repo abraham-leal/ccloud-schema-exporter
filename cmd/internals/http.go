@@ -8,7 +8,6 @@ package client
 import "io"
 import "net/http"
 
-
 func GetNewRequest(method string, endpoint string, key string, secret string, reader io.Reader) *http.Request {
 	req, err := http.NewRequest(method, endpoint, reader)
 	if err != nil {
