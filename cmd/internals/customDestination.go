@@ -28,25 +28,17 @@ func RunCustomDestinationSync(srcClient *SchemaRegistryClient, customDest Custom
 		}
 		beginSync := time.Now()
 
-		srcSubjects := make(map[string][]int64)
-		destSubjects := make(map[string][]int64)
-
-		srcChan := make(chan map[string][]int64)
-		destChan := make(chan map[string][]int64)
-
-		go srcClient.GetSubjectsWithVersions(srcChan)
-		go customDest.GetDestinationState(destChan)
-
-		srcSubjects = <-srcChan
-		destSubjects = <-destChan
+		srcSubjects := GetCurrentSubjectState(srcClient)
+		destSubjects, err := customDest.GetDestinationState()
+		checkDontFail(err)
 
 		if !reflect.DeepEqual(srcSubjects, destSubjects) {
 			diff := GetSubjectDiff(srcSubjects, destSubjects)
 			// Perform sync
-			customSync(diff, srcClient, customDest)
-			//We anticipate that the custom destination will not have
+			customDestSync(diff, srcClient, customDest)
+			//We anticipate that the custom destination will not have the notion of hard or soft deletes
 			if SyncDeletes {
-				customSyncDeletes(destSubjects, srcSubjects, srcClient, customDest)
+				customDestSyncDeletes(destSubjects, srcSubjects, srcClient, customDest)
 			}
 		}
 		syncDuration := time.Since(beginSync)
@@ -89,7 +81,7 @@ func RunCustomDestinationBatch(srcClient *SchemaRegistryClient, customDest Custo
 	}
 }
 
-func customSync(diff map[string][]int64, srcClient *SchemaRegistryClient, customDest CustomDestination) {
+func customDestSync(diff map[string][]int64, srcClient *SchemaRegistryClient, customDest CustomDestination) {
 	if len(diff) != 0 {
 		log.Println("Source registry has values that Destination does not, syncing...")
 		for subject, versions := range diff {
@@ -106,7 +98,7 @@ func customSync(diff map[string][]int64, srcClient *SchemaRegistryClient, custom
 	}
 }
 
-func customSyncDeletes(destSubjects map[string][]int64, srcSubjects map[string][]int64, srcClient *SchemaRegistryClient, customDest CustomDestination) {
+func customDestSyncDeletes(destSubjects map[string][]int64, srcSubjects map[string][]int64, srcClient *SchemaRegistryClient, customDest CustomDestination) {
 	diff := GetSubjectDiff(destSubjects, srcSubjects)
 	if len(diff) != 0 {
 		log.Println("Source registry has deletes that Destination does not, syncing...")
@@ -165,9 +157,8 @@ func (cd SampleCustomDestination) DeleteSchema(record SchemaRecord) error {
 	return nil
 }
 
-func (cd SampleCustomDestination) GetDestinationState(channel chan<- map[string][]int64) error {
-	channel <- cd.inMemState
-	return nil
+func (cd SampleCustomDestination) GetDestinationState() (map[string][]int64, error) {
+	return cd.inMemState, nil
 }
 
 func (cd SampleCustomDestination) TearDown() error {

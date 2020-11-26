@@ -64,25 +64,7 @@ func writeSchemaToSR(dstClient *SchemaRegistryClient, filepath string) {
 		return
 	}
 	id, version, subject, stype := parseFileName(filepath)
-	if len(AllowList) != 0 {
-		_, isAllowed := AllowList[subject]
-		if !isAllowed {
-			return
-		}
-	}
-	if len(DisallowList) != 0 {
-		_, isDisallowed := DisallowList[subject]
-		if isDisallowed {
-			return
-		}
-	}
-	if len(AllowList) != 0 && len(DisallowList) != 00 {
-		_, isAllowed := AllowList[subject]
-		_, isDisallowed := DisallowList[subject]
-		if !isAllowed || isDisallowed {
-			return
-		}
-	}
+	checkSubjectIsAllowed(subject)
 	rawSchema, err := ioutil.ReadFile(filepath)
 	check(err)
 	log.Printf("Registering Schema with Subject: %s. Version: %v, and ID: %v", subject, version, id)

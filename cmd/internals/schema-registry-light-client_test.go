@@ -69,7 +69,7 @@ func TIsReachable(t *testing.T) {
 
 func TSetCompat(t *testing.T) {
 	endpoint := fmt.Sprintf("%s/config", SRUrl)
-	req := GetNewRequest("GET", endpoint, "testUser", "testPass", nil)
+	req := GetNewRequest("GET", endpoint, "testUser", "testPass", nil, nil)
 	// Test Set READWRITE
 	testClient.SetGlobalCompatibility(FULL)
 	assert.True(t, performQuery(req)["compatibilityLevel"] == FULL.String())
@@ -93,7 +93,7 @@ func TIsCompatReady(t *testing.T) {
 
 func TSetMode(t *testing.T) {
 	endpoint := fmt.Sprintf("%s/mode", SRUrl)
-	req := GetNewRequest("GET", endpoint, "testUser", "testPass", nil)
+	req := GetNewRequest("GET", endpoint, "testUser", "testPass", nil, nil)
 	// Test Set READWRITE
 	testClient.SetMode(READWRITE)
 	assert.True(t, performQuery(req)["mode"] == READWRITE.String())

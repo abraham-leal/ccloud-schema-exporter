@@ -53,7 +53,7 @@ func NewSchemaRegistryClient(SR string, apiKey string, apiSecret string, target 
 // Returns whether a proper connection could be made to the Schema Registry by the client
 func (src *SchemaRegistryClient) IsReachable() bool {
 	endpoint := src.SRUrl
-	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
+	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -71,7 +71,7 @@ func (src *SchemaRegistryClient) IsReachable() bool {
 func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan<- map[string][]int64) {
 	src.InMemSchemas = make(map[string][]int64)
 	endpoint := fmt.Sprintf("%s/subjects", src.SRUrl)
-	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
+	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -133,7 +133,7 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan<- map[string
 func (src *SchemaRegistryClient) GetVersions(subject string, chanX chan<- SubjectWithVersions, wg *sync.WaitGroup) {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl, subject)
 	defer wg.Done()
-	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
+	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -189,7 +189,7 @@ func (src *SchemaRegistryClient) SetGlobalCompatibility(comptToSet Compatibility
 		return false
 	}
 
-	req := GetNewRequest("PUT", endpoint, src.SRApiKey, src.SRApiSecret, bytes.NewReader(toSend))
+	req := GetNewRequest("PUT", endpoint, src.SRApiKey, src.SRApiSecret, nil, bytes.NewReader(toSend))
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -231,7 +231,7 @@ func (src *SchemaRegistryClient) SetMode(modeToSet Mode) bool {
 		return false
 	}
 
-	req := GetNewRequest("PUT", endpoint, src.SRApiKey, src.SRApiSecret, bytes.NewReader(modeToSend))
+	req := GetNewRequest("PUT", endpoint, src.SRApiKey, src.SRApiSecret, nil, bytes.NewReader(modeToSend))
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -251,7 +251,7 @@ func (src *SchemaRegistryClient) SetMode(modeToSet Mode) bool {
 // Returns a SchemaRecord for the given subject and version by querying the backing Schema Registry
 func (src *SchemaRegistryClient) GetSchema(subject string, version int64) SchemaRecord {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d", src.SRUrl, subject, version)
-	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
+	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -297,7 +297,7 @@ func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion(schema s
 		log.Printf(err.Error())
 	}
 
-	req := GetNewRequest("POST", endpoint, src.SRApiKey, src.SRApiSecret, bytes.NewReader(schemaJSON))
+	req := GetNewRequest("POST", endpoint, src.SRApiKey, src.SRApiSecret, nil, bytes.NewReader(schemaJSON))
 
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -334,7 +334,7 @@ func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently() {
 	for subject, versions := range destSubjects {
 		for _, version := range versions {
 			if src.PerformSoftDelete(subject, version) {
-				go src.PerformHardDelete(subject, version)
+				src.PerformHardDelete(subject, version)
 			}
 		}
 	}
@@ -343,7 +343,7 @@ func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently() {
 // Performs a Soft Delete on the given subject and version on the backing Schema Registry
 func (src *SchemaRegistryClient) PerformSoftDelete(subject string, version int64) bool {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d", src.SRUrl, subject, version)
-	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret, nil)
+	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
@@ -357,7 +357,7 @@ func (src *SchemaRegistryClient) PerformSoftDelete(subject string, version int64
 // NOTE: A Hard Delete should only be performed after a soft delete
 func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int64) bool {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d?permanent=true", src.SRUrl, subject, version)
-	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret, nil)
+	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
@@ -399,7 +399,7 @@ func (src *SchemaRegistryClient) GetSoftDeletedIDs() map[int64]map[string]int64 
 func (src SchemaRegistryClient) getSchemaList(deleted bool) map[int64]SchemaExtraction {
 
 	endpoint := fmt.Sprintf("%s/schemas?deleted=%v", src.SRUrl, deleted)
-	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
+	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Fatalln(err.Error())
