@@ -31,8 +31,10 @@ func TCustomSourceBatch(t *testing.T) {
 	RunCustomSourceBatch(testClient, myTestCustomSource)
 
 	subjectState := GetCurrentSubjectState(testClient)
+	log.Println(subjectState)
+	log.Println(myTestCustomSource.inMemSchemas)
 
-	assert.True(t, reflect.DeepEqual(myTestCustomSource.inMemSchemas, subjectState))
+	assert.True(t,  reflect.DeepEqual(subjectState[myTestCustomSource.inMemSchemas[10001].Subject], []int64{1}))
 
 	testClient.DeleteAllSubjectsPermanently()
 }
@@ -54,8 +56,10 @@ func TCustomSourceSync(t *testing.T) {
 	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
 
 	subjectState := GetCurrentSubjectState(testClient)
+	log.Println(subjectState)
+	log.Println(myTestCustomSource.inMemSchemas)
 
-	assert.True(t, reflect.DeepEqual(map[string][]int64{"test-key": {1}}, subjectState))
+	assert.True(t,  reflect.DeepEqual(subjectState[myTestCustomSource.inMemSchemas[10001].Subject], []int64{1}))
 
 	CancelRun = true
 	time.Sleep(time.Duration(2) * time.Second) // Give time for killing goroutine

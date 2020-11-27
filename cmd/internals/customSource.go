@@ -82,8 +82,6 @@ func customSrcSyncDeletes(destSubjects map[string][]int64, srcSubjects map[strin
 		log.Println("Source registry has deletes that Destination does not, syncing...")
 		for sbj, versions := range diff {
 			for _, v := range versions {
-				_, _, _, err := customSrc.GetSchema(sbj, v)
-				checkDontFail(err)
 				if checkSubjectIsAllowed(sbj) {
 					dstClient.PerformSoftDelete(sbj, v)
 					dstClient.PerformHardDelete(sbj, v)
@@ -147,13 +145,15 @@ func NewApicurioSource() ApicurioSource {
 		}
 		log.Printf("Starting Apicurio Source with endpoint: %s", apicurioOptionsMap["apicurioUrl"])
 		return ApicurioSource{
-			Options:     apicurioOptionsMap,
-			apiCurioUrl: apicurioOptionsMap["apicurioUrl"],
+			Options:       apicurioOptionsMap,
+			apiCurioUrl:   apicurioOptionsMap["apicurioUrl"],
+			referenceName: map[string]string{},
 		}
 	}
 	return ApicurioSource{
-		Options:     apicurioOptionsMap,
-		apiCurioUrl: "http://localhost:8081/api",
+		Options:       apicurioOptionsMap,
+		apiCurioUrl:   "http://localhost:8081/api",
+		referenceName: map[string]string{},
 	}
 }
 
@@ -213,7 +213,7 @@ func (iM inMemRegistry) TearDown() error {
 // Another example of a custom source
 
 type SchemaApicurioMeta struct {
-	Name       string            `json:"subject"`
+	Name       string            `json:"name"`
 	CreatedOn  int64             `json:"createdOn,omitempty"`
 	ModifiedOn int64             `json:"modifiedOn,omitempty"`
 	Id         string            `json:"id,omitempty"`
@@ -226,11 +226,12 @@ type SchemaApicurioMeta struct {
 }
 
 type ApicurioSource struct {
-	Options     map[string]string
-	apiCurioUrl string
+	Options       map[string]string
+	apiCurioUrl   string
+	referenceName map[string]string
 }
 
-func (ap ApicurioSource) SetUp() error {
+func (ap *ApicurioSource) SetUp() error {
 	url, exists := ap.Options["apicurioUrl"]
 	if exists && ap.apiCurioUrl != "http://localhost:8081/api" {
 		ap.apiCurioUrl = url + "/api"
@@ -241,8 +242,13 @@ func (ap ApicurioSource) SetUp() error {
 	return nil
 }
 
-func (ap ApicurioSource) GetSchema(subject string, version int64) (id int64, stype string, schema string, err error) {
-	getSchemaEndpoint := fmt.Sprintf("%s/artifacts/%s/versions/%v", ap.apiCurioUrl, subject[:strings.LastIndex(subject, "-")], version)
+func (ap *ApicurioSource) GetSchema(subject string, version int64) (id int64, stype string, schema string, err error) {
+	artifactID, isThere := ap.referenceName[subject]
+	if !isThere {
+		log.Println("State snapshot does not match new requests. Allow a new run for a better sync.")
+	}
+	getSchemaEndpoint := fmt.Sprintf("%s/artifacts/%s/versions/%v", ap.apiCurioUrl, artifactID, version)
+	log.Println(getSchemaEndpoint)
 	metaEndpoint := getSchemaEndpoint + "/meta"
 	metaReq := GetNewRequest("GET", metaEndpoint, "x", "x", ap.Options, nil)
 	schemaReq := GetNewRequest("GET", getSchemaEndpoint, "x", "x", ap.Options, nil)
@@ -274,7 +280,8 @@ func (ap ApicurioSource) GetSchema(subject string, version int64) (id int64, sty
 	return metaResponseContainer.GlobalId, metaResponseContainer.Stype, string(schemaBody), nil
 }
 
-func (ap ApicurioSource) GetSourceState() (map[string][]int64, error) {
+func (ap *ApicurioSource) GetSourceState() (map[string][]int64, error) {
+	ap.referenceName = make(map[string]string)
 
 	// Get All Artifacts
 	listArtifactsEndpoint := fmt.Sprintf("%s/artifacts", ap.apiCurioUrl)
@@ -308,11 +315,46 @@ func (ap ApicurioSource) GetSourceState() (map[string][]int64, error) {
 		err = json.Unmarshal(versionsBody, &versionsResponseContainer)
 		checkDontFail(err)
 
-		ArtifactVersionMap[artifactID+"-value"] = versionsResponseContainer
+		ArtifactVersionMap[artifactID] = versionsResponseContainer
 	}
-	return ArtifactVersionMap, nil
+
+	sourceState := map[string][]int64{}
+	// Get All necessary metadata
+	for artifactID, versions := range ArtifactVersionMap {
+		for _, version := range versions {
+			listArtifactsVersionsMetaEndpoint := fmt.Sprintf("%s/%s/versions/%v/meta", listArtifactsEndpoint, artifactID, version)
+			metaReq := GetNewRequest("GET", listArtifactsVersionsMetaEndpoint, "x", "x", ap.Options, nil)
+
+			metaResponse, err := httpClient.Do(metaReq)
+			checkDontFail(err)
+			if metaResponse.StatusCode != 200 {
+				log.Println("Could not fetch schema metadata for state assessment")
+			}
+			metaResponseContainer := SchemaApicurioMeta{}
+			metaBody, err := ioutil.ReadAll(metaResponse.Body)
+			checkDontFail(err)
+			metaResponse.Body.Close()
+			err = json.Unmarshal(metaBody, &metaResponseContainer)
+			checkDontFail(err)
+
+			if metaResponseContainer.Stype == "AVRO" || metaResponseContainer.Stype == "JSON" ||
+				metaResponseContainer.Stype == "PROTOBUF" {
+				artifactVersions, haveSeenBefore := sourceState[artifactID]
+				if !haveSeenBefore {
+					sourceState[metaResponseContainer.Name] = []int64{metaResponseContainer.Version}
+					ap.referenceName[metaResponseContainer.Name] = artifactID
+				} else {
+					artifactVersions := append(artifactVersions, metaResponseContainer.Version)
+					sourceState[metaResponseContainer.Name] = artifactVersions
+					log.Println(sourceState)
+				}
+			}
+		}
+	}
+
+	return sourceState, nil
 }
 
-func (ap ApicurioSource) TearDown() error {
+func (ap *ApicurioSource) TearDown() error {
 	return nil
 }

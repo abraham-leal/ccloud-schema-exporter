@@ -125,12 +125,12 @@ func NewSampleCustomDestination() SampleCustomDestination {
 	return SampleCustomDestination{inMemState: map[string][]int64{}}
 }
 
-func (cd SampleCustomDestination) SetUp() error {
+func (cd *SampleCustomDestination) SetUp() error {
 	// Nothing to set up
 	return nil
 }
 
-func (cd SampleCustomDestination) RegisterSchema(record SchemaRecord) error {
+func (cd *SampleCustomDestination) RegisterSchema(record SchemaRecord) error {
 	currentVersionSlice, exists := cd.inMemState[record.Subject]
 	if exists {
 		tempVersionSlice := append(currentVersionSlice, record.Version)
@@ -143,7 +143,7 @@ func (cd SampleCustomDestination) RegisterSchema(record SchemaRecord) error {
 	return nil
 }
 
-func (cd SampleCustomDestination) DeleteSchema(record SchemaRecord) error {
+func (cd *SampleCustomDestination) DeleteSchema(record SchemaRecord) error {
 	currentVersionSlice, exists := cd.inMemState[record.Subject]
 	newSlice := currentVersionSlice
 	if exists {
@@ -157,11 +157,11 @@ func (cd SampleCustomDestination) DeleteSchema(record SchemaRecord) error {
 	return nil
 }
 
-func (cd SampleCustomDestination) GetDestinationState() (map[string][]int64, error) {
+func (cd *SampleCustomDestination) GetDestinationState() (map[string][]int64, error) {
 	return cd.inMemState, nil
 }
 
-func (cd SampleCustomDestination) TearDown() error {
+func (cd *SampleCustomDestination) TearDown() error {
 	// Nothing to tear-down
 	return nil
 }

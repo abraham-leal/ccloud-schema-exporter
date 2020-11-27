@@ -13,15 +13,16 @@ import (
 	"strings"
 )
 
+var sampleDestObject = client.NewSampleCustomDestination()
 var customDestFactory = map[string]client.CustomDestination{
-	"sampleCustomDestination": client.NewSampleCustomDestination(),
+	"sampleCustomDestination": &sampleDestObject,
 	// Add here a mapping of name -> customDestFactory/empty struct for reference at runtime
 	// See sample above for the built-in sample custom destination that is within the client package
 }
-
+var apicurioObject = client.NewApicurioSource()
 var customSrcFactory = map[string]client.CustomSource{
-	"sampleCustomSourceApicurio": client.NewApicurioSource(),
-	// Add here a mapping of name -> customDestFactory/empty struct for reference at runtime
+	"sampleCustomSourceApicurio": &apicurioObject,
+	// Add here a mapping of name -> customSrcFactory/empty struct for reference at runtime
 	// See sample above for the built-in sample custom source that is within the client package
 }
 

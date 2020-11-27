@@ -19,7 +19,7 @@ func TCustomDestinationBatch(t *testing.T) {
 	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, testingSubject, 10001, 1, "AVRO")
 	myTestCustomDestination := NewSampleCustomDestination()
 
-	RunCustomDestinationBatch(testClient, myTestCustomDestination)
+	RunCustomDestinationBatch(testClient, &myTestCustomDestination)
 
 	_, exists := myTestCustomDestination.inMemState[testingSubject]
 
@@ -31,7 +31,7 @@ func TCustomDestinationSync(t *testing.T) {
 	myTestCustomDestination := NewSampleCustomDestination()
 
 	ScrapeInterval = 3
-	go RunCustomDestinationSync(testClient, myTestCustomDestination)
+	go RunCustomDestinationSync(testClient, &myTestCustomDestination)
 	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
 
 	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, newSubject, 10001, 1, "AVRO")
