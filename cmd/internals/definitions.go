@@ -13,6 +13,7 @@ import (
 	"unicode"
 )
 
+// A client that can perform actions against a backing Schema Registry
 type SchemaRegistryClient struct {
 	SRUrl              string
 	SRApiKey           string
@@ -35,8 +36,22 @@ type CustomDestination interface {
 	DeleteSchema(record SchemaRecord) error
 	// An implementation should be able to send exactly one map describing the state of the destination
 	// This map should be minimal. Describing only the Subject and Versions that already exist.
-	// We assume this operation to be best done asynchronously, hence the channel.
-	GetDestinationState(channel chan<- map[string][]int64) error
+	GetDestinationState() (map[string][]int64, error)
+	// Perform any tear-down behavior before stop of sync/batch export
+	TearDown() error
+}
+
+/*
+Any struct that implements this interface is able to run an instance of sync and batch exporting.
+*/
+type CustomSource interface {
+	// Perform any set-up behavior before start of sync/batch export
+	SetUp() error
+	// An implementation should handle the retrieval of a schema from the source.
+	GetSchema(subject string, version int64) (id int64, stype string, schema string, err error)
+	// An implementation should be able to send exactly one map describing the state of the source
+	// This map should be minimal. Describing only the Subject and Versions that exist.
+	GetSourceState() (map[string][]int64, error)
 	// Perform any tear-down behavior before stop of sync/batch export
 	TearDown() error
 }

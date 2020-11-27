@@ -21,6 +21,7 @@ var DestSRUrl string
 var DestSRKey string
 var DestSRSecret string
 var CustomDestinationName string
+var CustomSourceName string
 var NoPrompt bool
 var SyncDeletes bool
 var SyncHardDeletes bool

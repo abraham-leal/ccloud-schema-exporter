@@ -13,15 +13,38 @@ import (
 	"strings"
 )
 
-var factory = map[string]client.CustomDestination{
-	"sampleCustomDestination": client.NewSampleCustomDestination(),
-	// Add here a mapping of name -> factory/empty struct for reference at runtime
+var sampleDestObject = client.NewSampleCustomDestination()
+var customDestFactory = map[string]client.CustomDestination{
+	"sampleCustomDestination": &sampleDestObject,
+	// Add here a mapping of name -> customDestFactory/empty struct for reference at runtime
 	// See sample above for the built-in sample custom destination that is within the client package
+}
+var apicurioObject = client.NewApicurioSource()
+var customSrcFactory = map[string]client.CustomSource{
+	"sampleCustomSourceApicurio": &apicurioObject,
+	// Add here a mapping of name -> customSrcFactory/empty struct for reference at runtime
+	// See sample above for the built-in sample custom source that is within the client package
 }
 
 func main() {
 
 	client.GetFlags()
+
+	if client.CustomSourceName != "" {
+
+		destClient := client.NewSchemaRegistryClient(client.DestSRUrl, client.DestSRKey, client.DestSRSecret, "dst")
+
+		if client.ThisRun == client.BATCH {
+			client.RunCustomSourceBatch(destClient, customSrcFactory[client.CustomSourceName])
+		}
+		if client.ThisRun == client.SYNC {
+			client.RunCustomSourceSync(destClient, customSrcFactory[client.CustomSourceName])
+		}
+		log.Println("-----------------------------------------------")
+		log.Println("All Done! Thanks for using ccloud-schema-exporter!")
+
+		os.Exit(0)
+	}
 
 	if client.ThisRun == client.FROMLOCAL {
 		workingDir, err := os.Getwd()
@@ -47,10 +70,10 @@ func main() {
 	if client.CustomDestinationName != "" {
 
 		if client.ThisRun == client.BATCH {
-			client.RunCustomDestinationBatch(srcClient, factory[client.CustomDestinationName])
+			client.RunCustomDestinationBatch(srcClient, customDestFactory[client.CustomDestinationName])
 		}
 		if client.ThisRun == client.SYNC {
-			client.RunCustomDestinationSync(srcClient, factory[client.CustomDestinationName])
+			client.RunCustomDestinationSync(srcClient, customDestFactory[client.CustomDestinationName])
 		}
 		log.Println("-----------------------------------------------")
 		log.Println("All Done! Thanks for using ccloud-schema-exporter!")

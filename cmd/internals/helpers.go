@@ -37,7 +37,7 @@ func printVersion() {
 }
 
 // Returns an HTTP request with the given information to execute
-func GetNewRequest(method string, endpoint string, key string, secret string, reader io.Reader) *http.Request {
+func GetNewRequest(method string, endpoint string, key string, secret string, headers map[string]string, reader io.Reader) *http.Request {
 	req, err := http.NewRequest(method, endpoint, reader)
 	if err != nil {
 		panic(err)
@@ -48,7 +48,38 @@ func GetNewRequest(method string, endpoint string, key string, secret string, re
 	req.Header.Add("User-Agent", "ccloud-schema-exporter/"+Version)
 	req.Header.Add("Correlation-Context", "service.name=ccloud-schema-exporter,service.version="+Version)
 
+	if headers != nil {
+		for key, val := range headers {
+			req.Header.Add(key, val)
+		}
+	}
+
 	return req
+}
+
+// Checks if the given subject is allowed by the defined Allow and Disallow Lists
+// Returns true if the subject is allowed
+func checkSubjectIsAllowed(subject string) bool {
+	if len(AllowList) != 0 {
+		_, isAllowed := AllowList[subject]
+		if !isAllowed {
+			return false
+		}
+	}
+	if len(DisallowList) != 0 {
+		_, isDisallowed := DisallowList[subject]
+		if isDisallowed {
+			return false
+		}
+	}
+	if len(AllowList) != 0 && len(DisallowList) != 00 {
+		_, isAllowed := AllowList[subject]
+		_, isDisallowed := DisallowList[subject]
+		if !isAllowed || isDisallowed {
+			return false
+		}
+	}
+	return true
 }
 
 // Deletes all registered schemas from the destination SR
@@ -172,7 +203,7 @@ func filterIDs(candidate map[int64]map[string]int64) map[int64]map[string]int64 
 // Not suitable for endpoint queries that do not conform to this structure
 func handleEndpointQuery(end string, src *SchemaRegistryClient) (map[string]string, bool) {
 	endpoint := fmt.Sprintf("%s/%s", src.SRUrl, end)
-	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil)
+	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 
 	res, err := httpClient.Do(req)
 	if err != nil {

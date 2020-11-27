@@ -3,7 +3,7 @@
 [![Build](https://travis-ci.com/abraham-leal/ccloud-schema-exporter.svg?branch=master)]() [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=abraham-leal_ccloud-schema-exporter&metric=alert_status)](https://sonarcloud.io/dashboard?id=abraham-leal_ccloud-schema-exporter)
 
 A tool to export schemas from a Confluent Cloud Schema Registry to another.
-This app supports three modes: `batchExport`, `sync`, `getLocalCopy`, and `-fromLocalCopy`.
+This app supports three modes: `batchExport`, `sync`, `getLocalCopy`, and `fromLocalCopy`.
 
 - `batchExport` will do a one time migration between schema registries, then it will reset the destination registry to `READWRTIE` mode.
 - `sync` will continuously sync newly registered schemas into the destination registry.
@@ -74,50 +74,52 @@ NOTE: Given that the exporter cannot determine a per-subject compatibility rule,
 ````
 Usage of ./ccloud-schema-exporter:
 
-  -allowList value
-    	A comma delimited list of schema subjects to allow. It also accepts paths to a file containing a list of subjects.
-  -batchExport
-    	Perform a one-time export of all schemas
-  -customDestination string
-    	Name of the implementation to be used as a destination (same as mapping)
-  -deleteAllFromDestination
-    	Setting this will run a delete on all schemas written to the destination registry. No respect for allow/disallow lists.
-  -dest-sr-key string
-    	API KEY for the Destination Schema Registry Cluster
-  -dest-sr-secret string
-    	API SECRET for the Destination Schema Registry Cluster
-  -dest-sr-url string
-    	Url to the Destination Schema Registry Cluster
-  -disallowList value
-    	A comma delimited list of schema subjects to disallow. It also accepts paths to a file containing a list of subjects.
-  -fromLocalCopy
-    	Registers all local schemas written by getLocalCopy. Defaults to a folder (SchemaRegistryBackup) in the current path of the binaries.
-  -getLocalCopy
-    	Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path of the binaries.
-  -localPath string
-    	Optional custom path for local functions. This must be an existing directory structure.
-  -noPrompt
-    	Set this flag to avoid checks while running. Assure you have the destination SR to correct Mode and Compatibility.
-  -scrapeInterval int
-    	Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds (default 60)
-  -src-sr-key string
-    	API KEY for the Source Schema Registry Cluster
-  -src-sr-secret string
-    	API SECRET for the Source Schema Registry Cluster
-  -src-sr-url string
-    	Url to the Source Schema Registry Cluster
-  -sync
-    	Sync schemas continuously
-  -syncDeletes
-    	Setting this will sync soft deletes from the source cluster to the destination
-  -syncHardDeletes
-    	Setting this will sync hard deletes from the source cluster to the destination
-  -timeout int
-    	Timeout, in seconds, to use for all REST calls with the Schema Registries (default 60)
-  -usage
-    	Print the usage of this tool
-  -version
-    	Print the current version and exit
+    -allowList value
+        A comma delimited list of schema subjects to allow. It also accepts paths to a file containing a list of subjects.
+    -batchExport
+        Perform a one-time export of all schemas
+    -customDestination string
+        Name of the implementation to be used as a destination (same as mapping)
+    -customSource string
+        Name of the implementation to be used as a source (same as mapping)
+    -deleteAllFromDestination
+        Setting this will run a delete on all schemas written to the destination registry. No respect for allow/disallow lists.
+    -dest-sr-key string
+        API KEY for the Destination Schema Registry Cluster
+    -dest-sr-secret string
+        API SECRET for the Destination Schema Registry Cluster
+    -dest-sr-url string
+        Url to the Destination Schema Registry Cluster
+    -disallowList value
+        A comma delimited list of schema subjects to disallow. It also accepts paths to a file containing a list of subjects.
+    -fromLocalCopy
+        Registers all local schemas written by getLocalCopy. Defaults to a folder (SchemaRegistryBackup) in the current path of the binaries.
+    -getLocalCopy
+        Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path of the binaries.
+    -localPath string
+        Optional custom path for local functions. This must be an existing directory structure.
+    -noPrompt
+        Set this flag to avoid checks while running. Assure you have the destination SR to correct Mode and Compatibility.
+    -scrapeInterval int
+        Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds (default 60)
+    -src-sr-key string
+        API KEY for the Source Schema Registry Cluster
+    -src-sr-secret string
+        API SECRET for the Source Schema Registry Cluster
+    -src-sr-url string
+        Url to the Source Schema Registry Cluster
+    -sync
+        Sync schemas continuously
+    -syncDeletes
+        Setting this will sync soft deletes from the source cluster to the destination
+    -syncHardDeletes
+        Setting this will sync hard deletes from the source cluster to the destination
+    -timeout int
+        Timeout, in seconds, to use for all REST calls with the Schema Registries (default 60)
+    -usage
+        Print the usage of this tool
+    -version
+        Print the current version and exit
 
 ````
 
@@ -168,13 +170,26 @@ Not setting this may result in some versions not being able to be registered sin
 
 If you'd like more info on how to change the Schema Registry mode to enable non-interactive runs, see the [Schema Registry API Documentation](https://docs.confluent.io/current/schema-registry/develop/api.html#mode)
 
-#### Custom Destinations / Extendability
+#### Extendability: Custom Sources and Destinations
 
-`ccloud-schema-exporter` supports custom implementations of destinations.
-If you'd like to leverage the already built back-end, all you have to do is an implementation the `CustomDestination` interface.
-A copy of the interface definition is below for convenience:
+`ccloud-schema-exporter` supports custom implementations of source registries and destination registries.
+If you'd like to leverage the already built back-end, all you have to do is an implementation the `CustomSource` or `CustomDestination` interface.
+A copy of the interface definitions is below for convenience:
 
 ````
+type CustomSource interface {
+	// Perform any set-up behavior before start of sync/batch export
+	SetUp() error
+	// An implementation should handle the retrieval of a schema from the source.
+	// The id should be a unique identifier for the schema.
+	GetSchema(SchemaSourceID int64) (subject string, version int64, id int64, stype string, schema string, err error)
+	// An implementation should be able to send exactly one map describing the state of the source
+	// This map should be minimal. Describing only the Subject and Versions that exist.
+	GetSourceState() (map[string][]int64, error)
+	// Perform any tear-down behavior before stop of sync/batch export
+	TearDown() error
+}
+
 type CustomDestination interface {
 	// Perform any set-up behavior before start of sync/batch export
 	SetUp() error
@@ -186,28 +201,41 @@ type CustomDestination interface {
 	DeleteSchema(record SchemaRecord) error
 	// An implementation should be able to send exactly one map describing the state of the destination
 	// This map should be minimal. Describing only the Subject and Versions that already exist.
-	// We assume this operation to be best done asynchronously, hence the channel.
-	GetDestinationState(channel chan <- map[string][]int64) error
+	GetDestinationState() (map[string][]int64, error)
 	// Perform any tear-down behavior before stop of sync/batch export
 	TearDown() error
 }
 ````
 
 Golang isn't candid on runtime lookup of implementations of interfaces, so in order to make this implementation to the tool you must register it.
-To register your implementation, go into `cmd/ccloud-schema-exporter/ccloud-schema-exporter.go` and modify the following map:
+To register your implementation, go into `cmd/ccloud-schema-exporter/ccloud-schema-exporter.go` and modify the following maps:
 
 ````
-var factory = map[string]client.CustomDestination{
-	"sampleCustomDestination": client.NewSampleCustomDestination(),
-	// Add here a mapping of name -> factory/empty struct for reference at runtime
+var sampleDestObject = client.NewSampleCustomDestination()
+var customDestFactory = map[string]client.CustomDestination{
+	"sampleCustomDestination": &sampleDestObject,
+	// Add here a mapping of name -> customDestFactory/empty struct for reference at runtime
 	// See sample above for the built-in sample custom destination that is within the client package
+}
+var apicurioObject = client.NewApicurioSource()
+var customSrcFactory = map[string]client.CustomSource{
+	"sampleCustomSourceApicurio": &apicurioObject,
+	// Add here a mapping of name -> customSrcFactory/empty struct for reference at runtime
+	// See sample above for the built-in sample custom source that is within the client package
 }
 ````
 
-You will see this map already has one entry, that is because `ccloud-schema-exporter` comes with a sample implementation of the interface under `cmd/internals/customDestination.go`, check it out!
+You will see that these maps already have one entry, that is because `ccloud-schema-exporter` comes with sample 
+implementations of the interface under `cmd/internals/customDestination.go` and `cmd/internals/customSource.go`, check them out!
 Make sure to add your implementation to this map.
 
-Once added, all you have to do is indicate you will want to run with a custom destination with the `-customDestination` flag.
+For the custom source example, there is an implementation to allow sourcing schemas from Apicurio into Schema Registry.
+It defaults to looking for Apicurio in `http://localhost:8081`, but you can override it by providing a mapping 
+`apicurioUrl=http://yourUrl:yourPort` in the environment variable `APICURIO_OPTIONS`. (if you'd like to pass more headers to the Apicurio calls, 
+you can do so through the same env variable by separating them through a semi-colon such as `apicurioUrl=http://yourUrl:yourPort;someHeader=someValue`)
+Note: The schemas get exported using record names (all treated as `-value`), so you'll want to use the RecordNameStrategy in Schema Registry clients to use the newly exported schemas!
+
+Once added, all you have to do is indicate you will want to run with a custom source/destination with the `-customSource | -customDestination` flag.
 The value of this flag must be the name you gave it in the factory mapping.
 
 The following options are respected for custom destinations as well:
