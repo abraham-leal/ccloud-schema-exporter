@@ -16,6 +16,9 @@ func TestMainStackCustomSource(t *testing.T) {
 }
 
 func TCustomSourceBatch(t *testing.T) {
+	testClient.DeleteAllSubjectsPermanently()
+
+	CancelRun = false
 	log.Println("Testing Custom Source in Batch Mode")
 
 	schema1 := SchemaRecord{
@@ -28,18 +31,18 @@ func TCustomSourceBatch(t *testing.T) {
 
 	myTestCustomSource := NewInMemRegistry([]SchemaRecord{schema1})
 
-	RunCustomSourceBatch(testClient, myTestCustomSource)
+	RunCustomSourceBatch(testClient, &myTestCustomSource)
 
 	subjectState := GetCurrentSubjectState(testClient)
-	log.Println(subjectState)
-	log.Println(myTestCustomSource.inMemSchemas)
 
-	assert.True(t,  reflect.DeepEqual(subjectState[myTestCustomSource.inMemSchemas[10001].Subject], []int64{1}))
+	assert.True(t, reflect.DeepEqual(subjectState[myTestCustomSource.inMemSchemas[10001].Subject], []int64{1}))
 
 	testClient.DeleteAllSubjectsPermanently()
 }
 
 func TCustomSourceSync(t *testing.T) {
+	testClient.DeleteAllSubjectsPermanently()
+
 	log.Println("Testing Custom Source in Sync Mode")
 	schema1 := SchemaRecord{
 		Subject: testingSubject,
@@ -52,14 +55,13 @@ func TCustomSourceSync(t *testing.T) {
 	myTestCustomSource := NewInMemRegistry([]SchemaRecord{schema1})
 
 	ScrapeInterval = 3
-	go RunCustomSourceSync(testClient, myTestCustomSource)
+	CancelRun = false
+	go RunCustomSourceSync(testClient, &myTestCustomSource)
 	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
 
 	subjectState := GetCurrentSubjectState(testClient)
-	log.Println(subjectState)
-	log.Println(myTestCustomSource.inMemSchemas)
 
-	assert.True(t,  reflect.DeepEqual(subjectState[myTestCustomSource.inMemSchemas[10001].Subject], []int64{1}))
+	assert.True(t, reflect.DeepEqual(subjectState[myTestCustomSource.inMemSchemas[10001].Subject], []int64{1}))
 
 	CancelRun = true
 	time.Sleep(time.Duration(2) * time.Second) // Give time for killing goroutine
