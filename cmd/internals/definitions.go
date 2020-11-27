@@ -13,6 +13,7 @@ import (
 	"unicode"
 )
 
+// A client that can perform actions against a backing Schema Registry
 type SchemaRegistryClient struct {
 	SRUrl              string
 	SRApiKey           string
@@ -47,8 +48,7 @@ type CustomSource interface {
 	// Perform any set-up behavior before start of sync/batch export
 	SetUp() error
 	// An implementation should handle the retrieval of a schema from the source.
-	// The id should be a unique identifier for the schema.
-	GetSchema(SchemaSourceID int64) (subject string, version int64, id int64, stype string, schema string, err error)
+	GetSchema(subject string, version int64) (id int64, stype string, schema string, err error)
 	// An implementation should be able to send exactly one map describing the state of the source
 	// This map should be minimal. Describing only the Subject and Versions that exist.
 	GetSourceState() (map[string][]int64, error)

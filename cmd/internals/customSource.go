@@ -58,18 +58,18 @@ func RunCustomSourceSync(dstClient *SchemaRegistryClient, customSrc CustomSource
 func customSrcSync(diff map[string][]int64, dstClient *SchemaRegistryClient, customSrc CustomSource) {
 	if len(diff) != 0 {
 		log.Println("Custom Source has values that Schema Registry does not, syncing...")
-		for _, versions := range diff {
+		for sbj, versions := range diff {
 			for _, v := range versions {
-				subject, version, id, stype, schema, err := customSrc.GetSchema(v)
+				id, stype, schema, err := customSrc.GetSchema(sbj, v)
 				if err != nil {
 					log.Println("Could not retrieve schema from custom source")
 				}
-				if checkSubjectIsAllowed(subject) {
-					log.Println("Registering new schema: " + subject +
-						" with version: " + strconv.FormatInt(version, 10) +
+				if checkSubjectIsAllowed(sbj) {
+					log.Println("Registering new schema: " + sbj +
+						" with version: " + strconv.FormatInt(v, 10) +
 						" and ID: " + strconv.FormatInt(id, 10) +
 						" and Type: " + stype)
-					dstClient.RegisterSchemaBySubjectAndIDAndVersion(schema, subject, id, version, stype)
+					dstClient.RegisterSchemaBySubjectAndIDAndVersion(schema, sbj, id, v, stype)
 				}
 			}
 		}
@@ -80,13 +80,13 @@ func customSrcSyncDeletes(destSubjects map[string][]int64, srcSubjects map[strin
 	diff := GetSubjectDiff(destSubjects, srcSubjects)
 	if len(diff) != 0 {
 		log.Println("Source registry has deletes that Destination does not, syncing...")
-		for _, versions := range diff {
+		for sbj, versions := range diff {
 			for _, v := range versions {
-				subject, version, _, _, _, err := customSrc.GetSchema(v)
+				_, _, _, err := customSrc.GetSchema(sbj, v)
 				checkDontFail(err)
-				if checkSubjectIsAllowed(subject) {
-					dstClient.PerformSoftDelete(subject, version)
-					dstClient.PerformHardDelete(subject, version)
+				if checkSubjectIsAllowed(sbj) {
+					dstClient.PerformSoftDelete(sbj, v)
+					dstClient.PerformHardDelete(sbj, v)
 				}
 			}
 		}
@@ -106,7 +106,7 @@ func RunCustomSourceBatch(dstClient *SchemaRegistryClient, customSrc CustomSourc
 	checkDontFail(err)
 
 	log.Println("Registering all schemas from custom source")
-	for _, srcIDs := range srcSubjects {
+	for sbj, srcVersions := range srcSubjects {
 		if CancelRun == true {
 			err := customSrc.TearDown()
 			if err != nil {
@@ -115,15 +115,15 @@ func RunCustomSourceBatch(dstClient *SchemaRegistryClient, customSrc CustomSourc
 			}
 			return
 		}
-		for _, v := range srcIDs {
-			subject, version, id, stype, schema, err := customSrc.GetSchema(v)
+		for _, v := range srcVersions {
+			id, stype, schema, err := customSrc.GetSchema(sbj, v)
 			if err != nil {
 				log.Println("Could not retrieve schema from custom source")
 			} else {
-				if checkSubjectIsAllowed(subject) {
+				if checkSubjectIsAllowed(sbj) {
 					log.Printf("Registering schema: %s with version: %d and ID: %d and Type: %s",
-						subject, version, id, stype)
-					dstClient.RegisterSchemaBySubjectAndIDAndVersion(schema, subject, id, version, stype)
+						sbj, v, id, stype)
+					dstClient.RegisterSchemaBySubjectAndIDAndVersion(schema, sbj, id, v, stype)
 				}
 
 			}
@@ -147,15 +147,70 @@ func NewApicurioSource() ApicurioSource {
 		}
 		log.Printf("Starting Apicurio Source with endpoint: %s", apicurioOptionsMap["apicurioUrl"])
 		return ApicurioSource{
-			Options: apicurioOptionsMap,
+			Options:     apicurioOptionsMap,
 			apiCurioUrl: apicurioOptionsMap["apicurioUrl"],
 		}
 	}
 	return ApicurioSource{
-		Options: apicurioOptionsMap,
+		Options:     apicurioOptionsMap,
 		apiCurioUrl: "http://localhost:8081/api",
 	}
 }
+
+// In-Mem Custom Source for testing purposes
+func NewInMemRegistry(records []SchemaRecord) inMemRegistry {
+	state := map[int64]SchemaRecord{}
+	for _, record := range records {
+		state[record.Id] = SchemaRecord{
+			Subject: record.Subject,
+			Schema:  record.Schema,
+			SType:   record.SType,
+			Version: record.Version,
+			Id:      record.Id,
+		}
+	}
+
+	return inMemRegistry{state}
+}
+
+/*
+Implementation of a simple custom source
+*/
+type inMemRegistry struct {
+	inMemSchemas map[int64]SchemaRecord
+}
+
+func (iM inMemRegistry) SetUp() error {
+	return nil
+}
+
+func (iM inMemRegistry) GetSchema(sbj string, version int64) (id int64, stype string, schema string, err error) {
+	for _, schemaRecord := range iM.inMemSchemas {
+		if schemaRecord.Subject == sbj && schemaRecord.Version == version {
+			return schemaRecord.Id, schemaRecord.SType, schemaRecord.Schema, nil
+		}
+	}
+	return 0, "", "", fmt.Errorf("schema not found")
+}
+
+func (iM inMemRegistry) GetSourceState() (map[string][]int64, error) {
+	currentState := map[string][]int64{}
+	for _, schemaRecord := range iM.inMemSchemas {
+		_, haveSeen := currentState[schemaRecord.Subject]
+		if haveSeen {
+			currentState[schemaRecord.Subject] = append(currentState[schemaRecord.Subject], schemaRecord.Version)
+		} else {
+			currentState[schemaRecord.Subject] = []int64{schemaRecord.Version}
+		}
+	}
+	return currentState, nil
+}
+
+func (iM inMemRegistry) TearDown() error {
+	return nil
+}
+
+// Another example of a custom source
 
 type SchemaApicurioMeta struct {
 	Name       string            `json:"subject"`
@@ -177,15 +232,17 @@ type ApicurioSource struct {
 
 func (ap ApicurioSource) SetUp() error {
 	url, exists := ap.Options["apicurioUrl"]
-	if exists && ap.apiCurioUrl != "http://localhost:8081/api"{
+	if exists && ap.apiCurioUrl != "http://localhost:8081/api" {
 		ap.apiCurioUrl = url + "/api"
 		delete(ap.Options, "apicurioUrl")
+	} else {
+		log.Println("Options not provided, using local apicurio connection at: http://localhost:8081")
 	}
 	return nil
 }
 
-func (ap ApicurioSource) GetSchema(SchemaSourceID int64) (subject string, version int64, id int64, stype string, schema string, err error) {
-	getSchemaEndpoint := fmt.Sprintf("%s/ids/%v", ap.apiCurioUrl, SchemaSourceID)
+func (ap ApicurioSource) GetSchema(subject string, version int64) (id int64, stype string, schema string, err error) {
+	getSchemaEndpoint := fmt.Sprintf("%s/artifacts/%s/versions/%v", ap.apiCurioUrl, subject[:strings.LastIndex(subject, "-")], version)
 	metaEndpoint := getSchemaEndpoint + "/meta"
 	metaReq := GetNewRequest("GET", metaEndpoint, "x", "x", ap.Options, nil)
 	schemaReq := GetNewRequest("GET", getSchemaEndpoint, "x", "x", ap.Options, nil)
@@ -214,12 +271,10 @@ func (ap ApicurioSource) GetSchema(SchemaSourceID int64) (subject string, versio
 	checkDontFail(err)
 	schemaResponse.Body.Close()
 
-	return metaResponseContainer.Id, metaResponseContainer.Version, metaResponseContainer.GlobalId, metaResponseContainer.Stype, string(schemaBody), nil
+	return metaResponseContainer.GlobalId, metaResponseContainer.Stype, string(schemaBody), nil
 }
 
 func (ap ApicurioSource) GetSourceState() (map[string][]int64, error) {
-
-	sourceState := map[string][]int64{}
 
 	// Get All Artifacts
 	listArtifactsEndpoint := fmt.Sprintf("%s/artifacts", ap.apiCurioUrl)
@@ -253,41 +308,9 @@ func (ap ApicurioSource) GetSourceState() (map[string][]int64, error) {
 		err = json.Unmarshal(versionsBody, &versionsResponseContainer)
 		checkDontFail(err)
 
-		ArtifactVersionMap[artifactID] = versionsResponseContainer
+		ArtifactVersionMap[artifactID+"-value"] = versionsResponseContainer
 	}
-
-	// Get All necessary metadata
-	for artifactID, versions := range ArtifactVersionMap {
-		for _, version := range versions {
-			listArtifactsVersionsMetaEndpoint := fmt.Sprintf("%s/%s/versions/%v/meta", listArtifactsEndpoint, artifactID, version)
-			metaReq := GetNewRequest("GET", listArtifactsVersionsMetaEndpoint, "x", "x", ap.Options, nil)
-
-			metaResponse, err := httpClient.Do(metaReq)
-			checkDontFail(err)
-			if metaResponse.StatusCode != 200 {
-				log.Println("Could not fetch schema metadata for state assessment")
-			}
-			metaResponseContainer := SchemaApicurioMeta{}
-			metaBody, err := ioutil.ReadAll(metaResponse.Body)
-			checkDontFail(err)
-			listResponse.Body.Close()
-			err = json.Unmarshal(metaBody, &metaResponseContainer)
-			checkDontFail(err)
-
-			if metaResponseContainer.Stype == "AVRO" || metaResponseContainer.Stype == "JSON" ||
-				metaResponseContainer.Stype == "PROTOBUF" {
-				artifactGlobalIDs, haveSeenBefore := sourceState[artifactID]
-				if !haveSeenBefore {
-					sourceState[artifactID] = []int64{metaResponseContainer.GlobalId}
-				} else {
-					artifactGlobalIDs := append(artifactGlobalIDs, metaResponseContainer.GlobalId)
-					sourceState[artifactID] = artifactGlobalIDs
-				}
-			}
-		}
-	}
-
-	return sourceState, nil
+	return ArtifactVersionMap, nil
 }
 
 func (ap ApicurioSource) TearDown() error {

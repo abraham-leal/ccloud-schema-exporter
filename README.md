@@ -168,13 +168,26 @@ Not setting this may result in some versions not being able to be registered sin
 
 If you'd like more info on how to change the Schema Registry mode to enable non-interactive runs, see the [Schema Registry API Documentation](https://docs.confluent.io/current/schema-registry/develop/api.html#mode)
 
-#### Custom Destinations / Extendability
+#### Extendability: Custom Sources and Destinations
 
-`ccloud-schema-exporter` supports custom implementations of destinations.
-If you'd like to leverage the already built back-end, all you have to do is an implementation the `CustomDestination` interface.
-A copy of the interface definition is below for convenience:
+`ccloud-schema-exporter` supports custom implementations of source registries and destination registries.
+If you'd like to leverage the already built back-end, all you have to do is an implementation the `CustomSource` or `CustomDestination` interface.
+A copy of the interface definitions is below for convenience:
 
 ````
+type CustomSource interface {
+	// Perform any set-up behavior before start of sync/batch export
+	SetUp() error
+	// An implementation should handle the retrieval of a schema from the source.
+	// The id should be a unique identifier for the schema.
+	GetSchema(SchemaSourceID int64) (subject string, version int64, id int64, stype string, schema string, err error)
+	// An implementation should be able to send exactly one map describing the state of the source
+	// This map should be minimal. Describing only the Subject and Versions that exist.
+	GetSourceState() (map[string][]int64, error)
+	// Perform any tear-down behavior before stop of sync/batch export
+	TearDown() error
+}
+
 type CustomDestination interface {
 	// Perform any set-up behavior before start of sync/batch export
 	SetUp() error
@@ -194,9 +207,14 @@ type CustomDestination interface {
 ````
 
 Golang isn't candid on runtime lookup of implementations of interfaces, so in order to make this implementation to the tool you must register it.
-To register your implementation, go into `cmd/ccloud-schema-exporter/ccloud-schema-exporter.go` and modify the following map:
+To register your implementation, go into `cmd/ccloud-schema-exporter/ccloud-schema-exporter.go` and modify the following maps:
 
 ````
+var customSrcFactory = map[string]client.CustomSource{
+	"sampleCustomSourceApicurio": client.NewApicurioSource(),
+	// Add here a mapping of name -> customDestFactory/empty struct for reference at runtime
+	// See sample above for the built-in sample custom source that is within the client package
+}
 var factory = map[string]client.CustomDestination{
 	"sampleCustomDestination": client.NewSampleCustomDestination(),
 	// Add here a mapping of name -> factory/empty struct for reference at runtime
@@ -204,10 +222,16 @@ var factory = map[string]client.CustomDestination{
 }
 ````
 
-You will see this map already has one entry, that is because `ccloud-schema-exporter` comes with a sample implementation of the interface under `cmd/internals/customDestination.go`, check it out!
+You will see that these maps already have one entry, that is because `ccloud-schema-exporter` comes with sample 
+implementations of the interface under `cmd/internals/customDestination.go` and `cmd/internals/customSource.go`, check them out!
 Make sure to add your implementation to this map.
 
-Once added, all you have to do is indicate you will want to run with a custom destination with the `-customDestination` flag.
+For the custom source example, there is an implementation to allow sourcing schemas from Apicurio into Schema Registry.
+It defaults to looking for Apicurio in `http://localhost:8081`, but you can override it by providing a mapping 
+`apicurioUrl=http://yourUrl:yourPort` in the environment variable `APICURIO_OPTIONS`. (if you'd like to pass more headers to the Apicurio rest calls, 
+you can do so through the same url by separating them through a semi-colon such as `apicurioUrl=http://yourUrl:yourPort;someHeader=someValue`)
+
+Once added, all you have to do is indicate you will want to run with a custom source/destination with the `-customSource | -customDestination` flag.
 The value of this flag must be the name you gave it in the factory mapping.
 
 The following options are respected for custom destinations as well:

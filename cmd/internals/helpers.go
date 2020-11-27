@@ -59,7 +59,7 @@ func GetNewRequest(method string, endpoint string, key string, secret string, he
 
 // Checks if the given subject is allowed by the defined Allow and Disallow Lists
 // Returns true if the subject is allowed
-func checkSubjectIsAllowed (subject string) bool {
+func checkSubjectIsAllowed(subject string) bool {
 	if len(AllowList) != 0 {
 		_, isAllowed := AllowList[subject]
 		if !isAllowed {
