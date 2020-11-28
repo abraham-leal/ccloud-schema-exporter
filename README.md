@@ -56,6 +56,7 @@ However, for stable images tag a release.
 
 ## Run
 - `./ccloud-schema-exporter -batchExport` : Running the app with this flag will perform a batch export.
+Starting v1.1, `-batchExport` can be declared with `-syncDeletes` to perform an export of soft deleted schemas. 
 - `./ccloud-schema-exporter -sync` : Running the app with this flag will start a continuous sync 
 between the source and destination schema registries.
 - `./ccloud-schema-exporter -getLocalCopy` : Running the app with this flag will get a snapshot of your Schema Registry

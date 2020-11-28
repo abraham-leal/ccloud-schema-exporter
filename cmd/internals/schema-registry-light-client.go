@@ -33,14 +33,14 @@ func NewSchemaRegistryClient(SR string, apiKey string, apiSecret string, target 
 	// If the parameters are empty, go fetch from env
 	if SR == "" || apiKey == "" || apiSecret == "" {
 		if target == "dst" {
-			client = SchemaRegistryClient{SRUrl: DestGetSRUrl(), SRApiKey: DestGetAPIKey(), SRApiSecret: DestGetAPISecret(), InMemSchemas: map[string][]int64{}, srcInMemDeletedIDs: map[int64]map[string]int64{}}
+			client = SchemaRegistryClient{SRUrl: DestGetSRUrl(), SRApiKey: DestGetAPIKey(), SRApiSecret: DestGetAPISecret()}
 		}
 		if target == "src" {
-			client = SchemaRegistryClient{SRUrl: SrcGetSRUrl(), SRApiKey: SrcGetAPIKey(), SRApiSecret: SrcGetAPISecret(), InMemSchemas: map[string][]int64{}, srcInMemDeletedIDs: map[int64]map[string]int64{}}
+			client = SchemaRegistryClient{SRUrl: SrcGetSRUrl(), SRApiKey: SrcGetAPIKey(), SRApiSecret: SrcGetAPISecret()}
 		}
 	} else {
 		// Enables passing in the vars through flags
-		client = SchemaRegistryClient{SRUrl: SR, SRApiKey: apiKey, SRApiSecret: apiSecret, InMemSchemas: map[string][]int64{}, srcInMemDeletedIDs: map[int64]map[string]int64{}}
+		client = SchemaRegistryClient{SRUrl: SR, SRApiKey: apiKey, SRApiSecret: apiSecret}
 	}
 
 	httpClient = http.Client{
@@ -69,7 +69,6 @@ func (src *SchemaRegistryClient) IsReachable() bool {
 
 // Returns all non-deleted (soft or hard deletions) subjects with their versions in the form of a map.
 func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan<- map[string][]int64) {
-	src.InMemSchemas = make(map[string][]int64)
 	endpoint := fmt.Sprintf("%s/subjects", src.SRUrl)
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 
@@ -121,12 +120,13 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan<- map[string
 	}()
 
 	//Collect SubjectWithVersions
+	tmpSchemaMap := make(map[string][]int64)
 	for item := range aChan {
-		src.InMemSchemas[item.Subject] = item.Versions
+		tmpSchemaMap[item.Subject] = item.Versions
 	}
 
 	// Send back to main thread
-	chanY <- src.InMemSchemas
+	chanY <- tmpSchemaMap
 }
 
 // Returns all non-deleted versions (soft or hard deleted) that exist for a given subject.
@@ -377,7 +377,6 @@ func (src *SchemaRegistryClient) GetSoftDeletedIDs() map[int64]map[string][]int6
 	responseWithOutDeletes := src.getSchemaList(false)
 
 	diff := GetIDDiff(responseWithDeletes, responseWithOutDeletes)
-	log.Println(diff)
 	return filterIDs(diff)
 }
 

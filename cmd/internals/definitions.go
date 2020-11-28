@@ -18,8 +18,6 @@ type SchemaRegistryClient struct {
 	SRUrl              string
 	SRApiKey           string
 	SRApiSecret        string
-	InMemSchemas       map[string][]int64
-	srcInMemDeletedIDs map[int64]map[string]int64
 }
 
 /*

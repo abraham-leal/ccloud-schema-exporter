@@ -33,6 +33,9 @@ func main() {
 	if client.CustomSourceName != "" {
 
 		destClient := client.NewSchemaRegistryClient(client.DestSRUrl, client.DestSRKey, client.DestSRSecret, "dst")
+		if !client.NoPrompt {
+			preflightWriteChecks(destClient)
+		}
 
 		if client.ThisRun == client.BATCH {
 			client.RunCustomSourceBatch(destClient, customSrcFactory[client.CustomSourceName])
@@ -53,6 +56,9 @@ func main() {
 		}
 
 		destClient := client.NewSchemaRegistryClient(client.DestSRUrl, client.DestSRKey, client.DestSRSecret, "dst")
+		if !client.NoPrompt {
+			preflightWriteChecks(destClient)
+		}
 
 		client.WriteFromFS(destClient, client.PathToWrite, workingDir)
 
@@ -95,69 +101,8 @@ func main() {
 	}
 
 	destClient := client.NewSchemaRegistryClient(client.DestSRUrl, client.DestSRKey, client.DestSRSecret, "dst")
-	if !destClient.IsReachable() {
-		log.Println("Could not reach destination registry. Possible bad credentials?")
-		os.Exit(0)
-	}
-
-	destChan := make(chan map[string][]int64)
-	go destClient.GetSubjectsWithVersions(destChan)
-	destSubjects := <-destChan
-	close(destChan)
-
-	if len(destSubjects) != 0 && client.ThisRun != client.SYNC && !client.NoPrompt {
-		log.Println("You have existing subjects registered in the destination registry, exporter cannot write schemas when " +
-			"previous schemas exist in batch mode.")
-		os.Exit(0)
-	}
-
-	if !destClient.IsImportModeReady() && !client.NoPrompt {
-
-		fmt.Println("Destination Schema Registry is not set to IMPORT mode!")
-		fmt.Println("------------------------------------------------------")
-		fmt.Println("Set to import mode? (Y/n)")
-
-		var text string
-
-		_, err := fmt.Scanln(&text)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if strings.EqualFold(text, "Y") {
-			err := destClient.SetMode(client.IMPORT)
-			if err == false {
-				log.Println("Could not set destination registry to IMPORT Mode.")
-				os.Exit(0)
-			}
-		} else {
-			log.Println("Cannot export schemas if destination is not set to IMPORT Mode")
-			os.Exit(0)
-		}
-	}
-
-	if !destClient.IsCompatReady() && !client.NoPrompt {
-
-		fmt.Println("Destination Schema Registry is not set to NONE global compatibility level!")
-		fmt.Println("We assume the source to be maintaining correct compatibility between registrations, per subject compatibility changes are not supported.")
-		fmt.Println("------------------------------------------------------")
-		fmt.Println("Set to NONE? (Y/n)")
-
-		var text string
-
-		_, err := fmt.Scanln(&text)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		if strings.EqualFold(text, "Y") {
-			err := destClient.SetGlobalCompatibility(client.NONE)
-			if err == false {
-				log.Fatalln("Could not set destination registry to Global NONE Compatibility Level.")
-			}
-		} else {
-			log.Println("Continuing without NONE Global Compatibility Level. Note this might arise some failures in registration of some schemas.")
-		}
+	if !client.NoPrompt {
+		preflightWriteChecks(destClient)
 	}
 
 	if (!strings.HasSuffix(srcClient.SRUrl, "confluent.cloud") ||
@@ -197,4 +142,68 @@ func main() {
 
 	log.Println("All Done! Thanks for using ccloud-schema-exporter!")
 
+}
+
+func preflightWriteChecks (destClient *client.SchemaRegistryClient) {
+
+	if !destClient.IsReachable() {
+		log.Println("Could not reach destination registry. Possible bad credentials?")
+		os.Exit(0)
+	}
+
+	destSubjects := client.GetCurrentSubjectState(destClient)
+	if len(destSubjects) != 0 && client.ThisRun != client.SYNC {
+		log.Println("You have existing subjects registered in the destination registry, exporter cannot write schemas when " +
+			"previous schemas exist in batch mode.")
+		os.Exit(0)
+	}
+
+	if !destClient.IsImportModeReady() {
+
+		fmt.Println("Destination Schema Registry is not set to IMPORT mode!")
+		fmt.Println("------------------------------------------------------")
+		fmt.Println("Set to import mode? (Y/n)")
+
+		var text string
+
+		_, err := fmt.Scanln(&text)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if strings.EqualFold(text, "Y") {
+			err := destClient.SetMode(client.IMPORT)
+			if err == false {
+				log.Println("Could not set destination registry to IMPORT Mode.")
+				os.Exit(0)
+			}
+		} else {
+			log.Println("Cannot export schemas if destination is not set to IMPORT Mode")
+			os.Exit(0)
+		}
+	}
+
+	if !destClient.IsCompatReady() {
+
+		fmt.Println("Destination Schema Registry is not set to NONE global compatibility level!")
+		fmt.Println("We assume the source to be maintaining correct compatibility between registrations, per subject compatibility changes are not supported.")
+		fmt.Println("------------------------------------------------------")
+		fmt.Println("Set to NONE? (Y/n)")
+
+		var text string
+
+		_, err := fmt.Scanln(&text)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if strings.EqualFold(text, "Y") {
+			err := destClient.SetGlobalCompatibility(client.NONE)
+			if err == false {
+				log.Fatalln("Could not set destination registry to Global NONE Compatibility Level.")
+			}
+		} else {
+			log.Println("Continuing without NONE Global Compatibility Level. Note this might arise some failures in registration of some schemas.")
+		}
+	}
 }
