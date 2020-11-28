@@ -21,9 +21,7 @@ func WriteToFS(srcClient *SchemaRegistryClient, definedPath string, workingDirec
 
 	definedPath = CheckPath(definedPath, workingDirectory)
 
-	srcChan := make(chan map[string][]int64)
-	go srcClient.GetSubjectsWithVersions(srcChan)
-	srcSubjects := <-srcChan
+	srcSubjects := GetCurrentSubjectState(srcClient)
 	var aGroup sync.WaitGroup
 
 	log.Printf("Writing all schemas from %s to path %s", srcClient.SRUrl, definedPath)
