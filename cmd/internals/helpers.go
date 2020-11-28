@@ -2,7 +2,7 @@ package client
 
 //
 // helpers.go
-// Author: Abraham Leal
+// Copyright 2020 Abraham Leal
 //
 
 import (
@@ -34,6 +34,23 @@ func checkDontFail(e error) {
 // Prints the version of the ccloud-schema-exporter
 func printVersion() {
 	fmt.Printf("ccloud-schema-exporter: %s\n", Version)
+}
+
+func fileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
+}
+
+func isInSlice(i int64, list []int64) bool {
+	for _, current := range list {
+		if current == i {
+			return true
+		}
+	}
+	return false
 }
 
 // Returns an HTTP request with the given information to execute
@@ -174,7 +191,7 @@ func filterListedSubjectsVersions(response []SubjectVersion) []SubjectVersion {
 }
 
 // Filters the provided map of [ID]:[Subject:Version] according to what is provided in AllowList and DisallowList
-func filterIDs(candidate map[int64]map[string]int64) map[int64]map[string]int64 {
+func filterIDs(candidate map[int64]map[string][]int64) map[int64]map[string][]int64 {
 
 	for id, subjects := range candidate { // Filter out for allow lists
 		for sbj, _ := range subjects {
@@ -265,23 +282,49 @@ func GetVersionsDiff(a1 []int64, a2 []int64) []int64 {
 
 // Returns the difference between the provided maps of [ID][Subject:Version]
 // The difference will be what is contained in the left map that is not contained in the right map
-func getIDDiff(m1 map[int64]map[string]int64, m2 map[int64]map[string]int64) map[int64]map[string]int64 {
-	diffMap := map[int64]map[string]int64{}
+func GetIDDiff(m1 map[int64]map[string][]int64, m2 map[int64]map[string][]int64) map[int64]map[string][]int64 {
+	diffMap := map[int64]map[string][]int64{}
 
-	for idDest, subjectValDestMap := range m2 { // Iterate through destination id -> (subject->version) mapping
-		subjValSrcMap, idExistsSrc := m1[idDest] // Check if source has this mapping, if it does, retrieve it
-		if !idExistsSrc {                        // if the source does NOT have this mapping
-			diffMap[idDest] = subjectValDestMap // This whole mapping gets added to the map of things to be deleted
-		} else { // if the source DOES have the ID
-			toDelete := map[string]int64{}                    // Holder for schema/version references to delete
-			for subDest, verDest := range subjectValDestMap { // iterate through subject/versions for current id
-				_, verSrcExists := subjValSrcMap[subDest] // check if they exist in source
-				if !verSrcExists {                        // if not exists
-					toDelete[subDest] = verDest // Add to holder for queueing for deletion
+	for idLeft, subjectVersionsLeftMap := range m1 { // Iterate through the left id -> (subject->version) mapping
+		subjVersionsRightMap, idExistsRight := m2[idLeft] // Check if right has this mapping, if it does, retrieve it
+		if !idExistsRight {                               // if the right does NOT have this mapping
+			diffMap[idLeft] = subjectVersionsLeftMap // This whole mapping gets added to the map of things to be deleted
+		} else { // if the right DOES have the ID
+			toDelete := map[int64]map[string][]int64{}                      // Holder for schema/version references to delete
+			for subjectLeft, versionsLeft := range subjectVersionsLeftMap { // iterate through subject/versions for current id
+				subjectRightVersions, subjectExistsRight := subjVersionsRightMap[subjectLeft]
+				if subjectExistsRight {
+					for _, singleVersionLeft := range versionsLeft { // Iterate through versions on left
+						if !isInSlice(singleVersionLeft, subjectRightVersions) {  // if not exists on right
+							_, idInQueue := toDelete[idLeft]
+							if idInQueue {
+								_, subjectInQueue := toDelete[idLeft][subjectLeft]
+								if subjectInQueue {
+									toDelete[idLeft][subjectLeft] = append(toDelete[idLeft][subjectLeft],singleVersionLeft) // Add to holder for queueing for deletion
+								} else {
+									tmpIDContents := toDelete[idLeft]
+									tmpIDContents[subjectLeft] = []int64{singleVersionLeft}
+									toDelete[idLeft] = tmpIDContents
+								}
+							} else {
+								tempMap := map[string][]int64{subjectLeft:{singleVersionLeft}}
+								toDelete[idLeft] = tempMap
+							}
+						}
+					}
+				} else {
+					_, idInQueue := toDelete[idLeft]
+					if idInQueue {
+						tempMap := toDelete[idLeft]
+						tempMap[subjectLeft] = versionsLeft
+						toDelete[idLeft] = tempMap
+					} else {
+						toDelete[idLeft] = map[string][]int64{subjectLeft : versionsLeft}
+					}
 				}
 			}
 			if len(toDelete) != 0 {
-				diffMap[idDest] = toDelete // Add deletion queue to diffMap
+				diffMap[idLeft] = toDelete[idLeft] // Add deletion queue to diffMap
 			}
 		}
 	}

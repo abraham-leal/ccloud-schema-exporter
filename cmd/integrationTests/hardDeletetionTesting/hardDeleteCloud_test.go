@@ -1,5 +1,11 @@
 package integration_deletion
 
+//
+// hardDeleteCloud_test.go
+// Copyright 2020 Abraham Leal
+//
+
+
 import (
 	client "github.com/abraham-leal/ccloud-schema-exporter/cmd/internals"
 	"github.com/stretchr/testify/assert"
@@ -98,7 +104,7 @@ func printSubjectTestResult(srcSubjects map[string][]int64, destSubjects map[str
 	log.Printf("Destination subject-version mapping contents: %v", destSubjects)
 }
 
-func printIDTestResult(srcIDs map[int64]map[string]int64, dstIDs map[int64]map[string]int64) {
+func printIDTestResult(srcIDs map[int64]map[string][]int64, dstIDs map[int64]map[string][]int64) {
 	log.Printf("Source IDs contents: %v", srcIDs)
 	log.Printf("Destination IDs contents: %v", dstIDs)
 }

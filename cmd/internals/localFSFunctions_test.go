@@ -1,5 +1,10 @@
 package client
 
+//
+// localFSFunctions_test.go
+// Copyright 2020 Abraham Leal
+//
+
 import (
 	"github.com/stretchr/testify/assert"
 	"testing"

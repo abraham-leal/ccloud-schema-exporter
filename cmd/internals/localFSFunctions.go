@@ -2,7 +2,7 @@ package client
 
 //
 // writeToLocal.go
-// Author: Abraham Leal
+// Copyright 2020 Abraham Leal
 //
 
 import (
@@ -94,7 +94,7 @@ func parseFileName(filepath string) (int64, int64, string, string) {
 
 // Writes the provided schema in the given path
 func writeSchemaLocally(srcClient *SchemaRegistryClient, pathToWrite string, subject string, version int64, wg *sync.WaitGroup) {
-	rawSchema := srcClient.GetSchema(subject, version)
+	rawSchema := srcClient.GetSchema(subject, version, false)
 	defer wg.Done()
 	if CancelRun == true {
 		return

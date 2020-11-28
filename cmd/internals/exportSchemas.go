@@ -2,7 +2,7 @@ package client
 
 //
 // exportSchemas.go
-// Author: Abraham Leal
+// Copyright 2020 Abraham Leal
 //
 
 import (
@@ -22,7 +22,7 @@ func BatchExport(srcClient *SchemaRegistryClient, destClient *SchemaRegistryClie
 			return
 		}
 		for _, v := range srcVersions {
-			schema := srcClient.GetSchema(srcSubject, v)
+			schema := srcClient.GetSchema(srcSubject, v, false)
 			log.Printf("Registering schema: %s with version: %d and ID: %d and Type: %s",
 				schema.Subject, schema.Version, schema.Id, schema.SType)
 			destClient.RegisterSchemaBySubjectAndIDAndVersion(schema.Schema,

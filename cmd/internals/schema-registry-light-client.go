@@ -2,7 +2,7 @@ package client
 
 //
 // schema-registry-light-client.go
-// Author: Abraham Leal
+// Copyright 2020 Abraham Leal
 //
 
 import (
@@ -249,8 +249,11 @@ func (src *SchemaRegistryClient) SetMode(modeToSet Mode) bool {
 }
 
 // Returns a SchemaRecord for the given subject and version by querying the backing Schema Registry
-func (src *SchemaRegistryClient) GetSchema(subject string, version int64) SchemaRecord {
+func (src *SchemaRegistryClient) GetSchema(subject string, version int64, deleted bool) SchemaRecord {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d", src.SRUrl, subject, version)
+	if deleted {
+		endpoint = fmt.Sprintf("%s/subjects/%s/versions/%d?deleted=true", src.SRUrl, subject, version)
+	}
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 
 	res, err := httpClient.Do(req)
@@ -367,38 +370,25 @@ func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int64
 	return handleDeletesHTTPResponse(res.Body, res.StatusCode, req.Method, endpoint, "Hard", subject, version)
 }
 
-// Returns a map with the [ID][Subject:Version] state of the backing Schema Registry for only the soft deleted SubjectVersions
-func (src *SchemaRegistryClient) GetSoftDeletedIDs() map[int64]map[string]int64 {
-	src.srcInMemDeletedIDs = map[int64]map[string]int64{} // Map of ID -> (Map of subject -> Version)
+// Returns a map with the [ID][Subject:Versions] state of the backing Schema Registry for only the soft deleted SubjectVersions
+func (src *SchemaRegistryClient) GetSoftDeletedIDs() map[int64]map[string][]int64 {
 
 	responseWithDeletes := src.getSchemaList(true)
 	responseWithOutDeletes := src.getSchemaList(false)
 
-	listHolder := make(map[int64]map[string]int64)
-	for id, data := range responseWithDeletes {
-		_, contains := responseWithOutDeletes[id]
-		if !contains {
-			holder, seenBefore := listHolder[id]
-			if seenBefore {
-				holder[data.Subject] = data.Version
-				listHolder[id] = holder
-			} else {
-				newIdHolder := make(map[string]int64)
-				newIdHolder[data.Subject] = data.Version
-				listHolder[id] = newIdHolder
-			}
-		}
-	}
-
-	src.srcInMemDeletedIDs = filterIDs(listHolder)
-	return src.srcInMemDeletedIDs
+	diff := GetIDDiff(responseWithDeletes, responseWithOutDeletes)
+	log.Println(diff)
+	return filterIDs(diff)
 }
 
 // Returns a dump of all Schemas mapped to their IDs from the backing Schema Registry
 // The parameter specifies whether to show soft deleted schemas as well
-func (src SchemaRegistryClient) getSchemaList(deleted bool) map[int64]SchemaExtraction {
-
+func (src *SchemaRegistryClient) getSchemaList(deleted bool) map[int64]map[string][]int64 {
 	endpoint := fmt.Sprintf("%s/schemas?deleted=%v", src.SRUrl, deleted)
+	if !deleted {
+		endpoint = fmt.Sprintf("%s/schemas", src.SRUrl)
+	}
+
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -418,10 +408,23 @@ func (src SchemaRegistryClient) getSchemaList(deleted bool) map[int64]SchemaExtr
 		log.Printf(err.Error())
 	}
 
-	responseMap := make(map[int64]SchemaExtraction)
+	responseMap := make(map[int64]map[string][]int64)
 
 	for _, schema := range response {
-		responseMap[schema.Id] = schema
+		currentStateOfID, haveSeenIDBefore := responseMap[schema.Id]
+		if haveSeenIDBefore {
+			_, haveSeenSubject := currentStateOfID[schema.Subject]
+			if haveSeenSubject {
+				responseMap[schema.Id][schema.Subject] = append(responseMap[schema.Id][schema.Subject],schema.Version)
+			} else {
+				tempMap := responseMap[schema.Id]
+				tempMap[schema.Subject] = []int64{schema.Version}
+				responseMap[schema.Id] = tempMap
+			}
+		} else {
+			responseMap[schema.Id] = map[string][]int64{schema.Subject : {schema.Version}}
+		}
+
 	}
 
 	return responseMap

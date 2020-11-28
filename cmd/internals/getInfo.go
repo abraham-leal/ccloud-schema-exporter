@@ -2,7 +2,7 @@ package client
 
 //
 // getInfo.go
-// Author: Abraham Leal
+// Copyright 2020 Abraham Leal
 //
 
 import (

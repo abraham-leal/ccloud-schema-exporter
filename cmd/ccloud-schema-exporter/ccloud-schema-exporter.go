@@ -2,7 +2,7 @@ package main
 
 //
 // ccloud-schema-exporter.go
-// Author: Abraham Leal
+// Copyright 2020 Abraham Leal
 //
 
 import (

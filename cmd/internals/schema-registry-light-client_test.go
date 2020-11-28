@@ -1,8 +1,8 @@
 package client
 
 //
-// schema-registry-light-client-test.go
-// Author: Abraham Leal
+// schema-registry-light-client_test.go
+// Copyright 2020 Abraham Leal
 //
 
 import (
@@ -41,6 +41,7 @@ func TestMainStack(t *testing.T) {
 	t.Run("TFilterListedSubjectsVersions", func(t *testing.T) { TFilterListedSubjectsVersions(t) })
 	t.Run("TPerformSoftDelete", func(t *testing.T) { TPerformSoftDelete(t) })
 	t.Run("TPerformHardDelete", func(t *testing.T) { TPerformHardDelete(t) })
+	t.Run("TGetSoftDeletedIds", func(t *testing.T) { TPerformHardDelete(t) })
 	t.Run("TDeleteAllSubjectsPermanently", func(t *testing.T) { TDeleteAllSubjectsPermanently(t) })
 	tearDown()
 }
@@ -144,13 +145,13 @@ func TGetVersions(t *testing.T) {
 }
 
 func TGetSchema(t *testing.T) {
-	record := testClient.GetSchema(testingSubject, 1)
+	record := testClient.GetSchema(testingSubject, 1,false)
 	assert.Equal(t, mockSchema, record.Schema)
 }
 
 func TRegisterSchemaBySubjectAndIDAndVersion(t *testing.T) {
 	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, newSubject, 10001, 1, "AVRO")
-	record := testClient.GetSchema(newSubject, 1)
+	record := testClient.GetSchema(newSubject, 1,false)
 	assert.Equal(t, mockSchema, record.Schema)
 
 	testClient.PerformSoftDelete(newSubject, 1)
@@ -170,9 +171,9 @@ func TGetSoftDeletedIDs(t *testing.T) {
 
 func TFilterIDs(t *testing.T) {
 
-	myIDs := map[int64]map[string]int64{
-		10001: {testingSubject: 1},
-		10002: {newSubject: 1},
+	myIDs := map[int64]map[string][]int64{
+		10001: {testingSubject: []int64{1}},
+		10002: {newSubject: []int64{1}},
 	}
 
 	// Test Allow lists
@@ -181,8 +182,8 @@ func TFilterIDs(t *testing.T) {
 	}
 	DisallowList = nil
 
-	expected := map[int64]map[string]int64{
-		10002: {newSubject: 1},
+	expected := map[int64]map[string][]int64{
+		10002: {newSubject: []int64{1}},
 	}
 
 	filtered := filterIDs(myIDs)
@@ -195,13 +196,13 @@ func TFilterIDs(t *testing.T) {
 		newSubject: true,
 	}
 
-	myIDs = map[int64]map[string]int64{
-		10001: {testingSubject: 1},
-		10002: {newSubject: 1},
+	myIDs = map[int64]map[string][]int64{
+		10001: {testingSubject: []int64{1}},
+		10002: {newSubject: []int64{1}},
 	}
 
-	expected = map[int64]map[string]int64{
-		10001: {testingSubject: 1},
+	expected = map[int64]map[string][]int64{
+		10001: {testingSubject: []int64{1}},
 	}
 
 	filtered = filterIDs(myIDs)
@@ -209,11 +210,11 @@ func TFilterIDs(t *testing.T) {
 	assert.Equal(t, expected, filtered)
 
 	// Test Both
-	myIDs = map[int64]map[string]int64{
-		10001: {testingSubject: 1},
-		10002: {newSubject: 1},
-		10003: {"hello": 1},
-		10004: {"IAmSubject": 1},
+	myIDs = map[int64]map[string][]int64{
+		10001: {testingSubject: []int64{1}},
+		10002: {newSubject: []int64{1}},
+		10003: {"hello": []int64{1}},
+		10004: {"IAmSubject": []int64{1}},
 	}
 	AllowList = StringArrayFlag{
 		newSubject:     true,
@@ -225,9 +226,9 @@ func TFilterIDs(t *testing.T) {
 	}
 
 	// Expect hello to be disallowed
-	expected = map[int64]map[string]int64{
-		10001: {testingSubject: 1},
-		10002: {newSubject: 1},
+	expected = map[int64]map[string][]int64{
+		10001: {testingSubject: []int64{1}},
+		10002: {newSubject: []int64{1}},
 	}
 
 	filtered = filterIDs(myIDs)
@@ -341,7 +342,7 @@ func TPerformSoftDelete(t *testing.T) {
 	//Soft delete it
 	testClient.PerformSoftDelete(testingSubject, 1)
 	//Check for it
-	checkIfSchemaRegistered := testClient.GetSchema(testingSubject, 1)
+	checkIfSchemaRegistered := testClient.GetSchema(testingSubject, 1, false)
 	assert.Equal(t, "", checkIfSchemaRegistered.Schema)
 }
 
