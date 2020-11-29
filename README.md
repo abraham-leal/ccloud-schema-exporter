@@ -149,7 +149,7 @@ NOTE: Lists aren't respected with the utility `-deleteAllFromDestination`
 
 #### A note on syncing hard deletions
 
-As of v1.1, `ccloud-schema-exporter` provides an efficient way of syncing hard deletions.
+Starting v1.1, `ccloud-schema-exporter` provides an efficient way of syncing hard deletions.
 In previous versions, this was done through inefficient lookups.
 
 Support for syncing hard deletions applies when the source and destination are both a Confluent Cloud Schema Registries.
