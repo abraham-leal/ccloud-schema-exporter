@@ -1,5 +1,11 @@
 package integration
 
+//
+// exporter-integration_test.go
+// Copyright 2020 Abraham Leal
+//
+
+
 import (
 	client "github.com/abraham-leal/ccloud-schema-exporter/cmd/internals"
 	"github.com/stretchr/testify/assert"

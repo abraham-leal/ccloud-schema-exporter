@@ -2,7 +2,7 @@ package client
 
 //
 // writeToLocal.go
-// Author: Abraham Leal
+// Copyright 2020 Abraham Leal
 //
 
 import (
@@ -21,9 +21,7 @@ func WriteToFS(srcClient *SchemaRegistryClient, definedPath string, workingDirec
 
 	definedPath = CheckPath(definedPath, workingDirectory)
 
-	srcChan := make(chan map[string][]int64)
-	go srcClient.GetSubjectsWithVersions(srcChan)
-	srcSubjects := <-srcChan
+	srcSubjects := GetCurrentSubjectState(srcClient)
 	var aGroup sync.WaitGroup
 
 	log.Printf("Writing all schemas from %s to path %s", srcClient.SRUrl, definedPath)
@@ -64,11 +62,12 @@ func writeSchemaToSR(dstClient *SchemaRegistryClient, filepath string) {
 		return
 	}
 	id, version, subject, stype := parseFileName(filepath)
-	checkSubjectIsAllowed(subject)
-	rawSchema, err := ioutil.ReadFile(filepath)
-	check(err)
-	log.Printf("Registering Schema with Subject: %s. Version: %v, and ID: %v", subject, version, id)
-	dstClient.RegisterSchemaBySubjectAndIDAndVersion(string(rawSchema), subject, id, version, stype)
+	if checkSubjectIsAllowed(subject) {
+		rawSchema, err := ioutil.ReadFile(filepath)
+		check(err)
+		log.Printf("Registering Schema with Subject: %s. Version: %v, and ID: %v", subject, version, id)
+		dstClient.RegisterSchemaBySubjectAndIDAndVersion(string(rawSchema), subject, id, version, stype)
+	}
 }
 
 // Returns schema metadata for a file given its path
@@ -94,7 +93,7 @@ func parseFileName(filepath string) (int64, int64, string, string) {
 
 // Writes the provided schema in the given path
 func writeSchemaLocally(srcClient *SchemaRegistryClient, pathToWrite string, subject string, version int64, wg *sync.WaitGroup) {
-	rawSchema := srcClient.GetSchema(subject, version)
+	rawSchema := srcClient.GetSchema(subject, version, false)
 	defer wg.Done()
 	if CancelRun == true {
 		return

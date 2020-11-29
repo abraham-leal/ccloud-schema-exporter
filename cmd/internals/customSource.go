@@ -1,5 +1,10 @@
 package client
 
+//
+// customSource.go
+// Copyright 2020 Abraham Leal
+//
+
 import (
 	"encoding/json"
 	"fmt"

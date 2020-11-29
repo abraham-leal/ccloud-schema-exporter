@@ -1,5 +1,10 @@
 package client
 
+//
+// customDestination.go
+// Copyright 2020 Abraham Leal
+//
+
 import (
 	"log"
 	"reflect"
@@ -72,7 +77,7 @@ func RunCustomDestinationBatch(srcClient *SchemaRegistryClient, customDest Custo
 			return
 		}
 		for _, v := range srcVersions {
-			schema := srcClient.GetSchema(srcSubject, v)
+			schema := srcClient.GetSchema(srcSubject, v, false)
 			log.Printf("Registering schema: %s with version: %d and ID: %d and Type: %s",
 				schema.Subject, schema.Version, schema.Id, schema.SType)
 			err := customDest.RegisterSchema(schema)
@@ -86,7 +91,7 @@ func customDestSync(diff map[string][]int64, srcClient *SchemaRegistryClient, cu
 		log.Println("Source registry has values that Destination does not, syncing...")
 		for subject, versions := range diff {
 			for _, v := range versions {
-				schema := srcClient.GetSchema(subject, v)
+				schema := srcClient.GetSchema(subject, v, false)
 				log.Println("Registering new schema: " + schema.Subject +
 					" with version: " + strconv.FormatInt(schema.Version, 10) +
 					" and ID: " + strconv.FormatInt(schema.Id, 10) +
@@ -104,7 +109,7 @@ func customDestSyncDeletes(destSubjects map[string][]int64, srcSubjects map[stri
 		log.Println("Source registry has deletes that Destination does not, syncing...")
 		for subject, versions := range diff {
 			for _, v := range versions {
-				schema := srcClient.GetSchema(subject, v)
+				schema := srcClient.GetSchema(subject, v, false)
 				err := customDest.DeleteSchema(schema)
 				checkCouldNotRegister(err)
 			}

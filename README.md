@@ -56,6 +56,7 @@ However, for stable images tag a release.
 
 ## Run
 - `./ccloud-schema-exporter -batchExport` : Running the app with this flag will perform a batch export.
+Starting v1.1, `-batchExport` can be declared with `-syncDeletes` to perform an export of soft deleted schemas. 
 - `./ccloud-schema-exporter -sync` : Running the app with this flag will start a continuous sync 
 between the source and destination schema registries.
 - `./ccloud-schema-exporter -getLocalCopy` : Running the app with this flag will get a snapshot of your Schema Registry
@@ -148,10 +149,10 @@ NOTE: Lists aren't respected with the utility `-deleteAllFromDestination`
 
 #### A note on syncing hard deletions
 
-As of v1.1, `ccloud-schema-exporter` provides an efficient way of syncing hard deletions.
+Starting v1.1, `ccloud-schema-exporter` provides an efficient way of syncing hard deletions.
 In previous versions, this was done through inefficient lookups.
 
-Support for syncing hard deletions is only when the source and destination are both a Confluent Cloud Schema Registry.
+Support for syncing hard deletions applies when the source and destination are both a Confluent Cloud Schema Registries.
 
 #### Non-Interactive Run
 
@@ -172,8 +173,8 @@ If you'd like more info on how to change the Schema Registry mode to enable non-
 
 #### Extendability: Custom Sources and Destinations
 
-`ccloud-schema-exporter` supports custom implementations of source registries and destination registries.
-If you'd like to leverage the already built back-end, all you have to do is an implementation the `CustomSource` or `CustomDestination` interface.
+`ccloud-schema-exporter` supports custom implementations of sources and destinations.
+If you'd like to leverage the already built back-end, all you have to do is an implementation of the `CustomSource` or `CustomDestination` interfaces.
 A copy of the interface definitions is below for convenience:
 
 ````
@@ -181,8 +182,7 @@ type CustomSource interface {
 	// Perform any set-up behavior before start of sync/batch export
 	SetUp() error
 	// An implementation should handle the retrieval of a schema from the source.
-	// The id should be a unique identifier for the schema.
-	GetSchema(SchemaSourceID int64) (subject string, version int64, id int64, stype string, schema string, err error)
+	GetSchema(subject string, version int64) (id int64, stype string, schema string, err error)
 	// An implementation should be able to send exactly one map describing the state of the source
 	// This map should be minimal. Describing only the Subject and Versions that exist.
 	GetSourceState() (map[string][]int64, error)
@@ -227,7 +227,6 @@ var customSrcFactory = map[string]client.CustomSource{
 
 You will see that these maps already have one entry, that is because `ccloud-schema-exporter` comes with sample 
 implementations of the interface under `cmd/internals/customDestination.go` and `cmd/internals/customSource.go`, check them out!
-Make sure to add your implementation to this map.
 
 For the custom source example, there is an implementation to allow sourcing schemas from Apicurio into Schema Registry.
 It defaults to looking for Apicurio in `http://localhost:8081`, but you can override it by providing a mapping 
@@ -238,7 +237,7 @@ Note: The schemas get exported using record names (all treated as `-value`), so 
 Once added, all you have to do is indicate you will want to run with a custom source/destination with the `-customSource | -customDestination` flag.
 The value of this flag must be the name you gave it in the factory mapping.
 
-The following options are respected for custom destinations as well:
+The following options are respected for custom sources / destinations as well:
 
 ````
   -allowList value

@@ -2,7 +2,7 @@ package client
 
 //
 // meta.go
-// Author: Abraham Leal
+// Copyright 2020 Abraham Leal
 //
 
 import (
@@ -11,7 +11,7 @@ import (
 
 var HttpCallTimeout int
 var ScrapeInterval int
-var Version = "1.1-SNAPSHOT"
+var Version = "1.1"
 var httpClient http.Client
 
 var SrcSRUrl string

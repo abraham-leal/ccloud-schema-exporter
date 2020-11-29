@@ -2,7 +2,7 @@ package client
 
 //
 // definitions.go
-// Author: Abraham Leal
+// Copyright 2020 Abraham Leal
 //
 
 import (
@@ -18,8 +18,6 @@ type SchemaRegistryClient struct {
 	SRUrl              string
 	SRApiKey           string
 	SRApiSecret        string
-	InMemSchemas       map[string][]int64
-	srcInMemDeletedIDs map[int64]map[string]int64
 }
 
 /*
@@ -56,6 +54,7 @@ type CustomSource interface {
 	TearDown() error
 }
 
+// Holding struct that describes a schema record
 type SchemaRecord struct {
 	Subject string `json:"subject"`
 	Schema  string `json:"schema"`
@@ -73,6 +72,7 @@ func (srs SchemaRecord) setTypeIfEmpty() SchemaRecord {
 	return srs
 }
 
+// Holding struct for registering a schema in an SR compliant way
 type SchemaToRegister struct {
 	Schema  string `json:"schema"`
 	Id      int64  `json:"id,omitempty"`
@@ -80,6 +80,7 @@ type SchemaToRegister struct {
 	SType   string `json:"schemaType"`
 }
 
+// Holding struct for retrieving a schema
 type SchemaExtraction struct {
 	Schema  string `json:"schema"`
 	Id      int64  `json:"id"`
@@ -113,9 +114,9 @@ func (i *StringArrayFlag) String() string {
 
 func (i *StringArrayFlag) Set(value string) error {
 	currentPath, _ := os.Getwd()
+	path := CheckPath(value, currentPath)
 
-	if strings.LastIndexAny(value, "/.") != -1 {
-		path := CheckPath(value, currentPath)
+	if fileExists(path) {
 		f, err := ioutil.ReadFile(path)
 		if err != nil {
 			panic(err)
@@ -143,9 +144,4 @@ func (i *StringArrayFlag) removeSpaces(str string) string {
 		}
 		return r
 	}, str)
-}
-
-type idSubjectVersion struct {
-	Id                int64            `json:"Id"`
-	SubjectAndVersion map[string]int64 `json:"SubjectAndVersion"`
 }
