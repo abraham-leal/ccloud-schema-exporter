@@ -254,6 +254,11 @@ The following options are respected for custom sources / destinations as well:
     	Setting this will sync soft deletes from the source cluster to the destination
 ````
 
+#### Monitoring
+
+When specified with `-withMetrics`, `ccloud-schema-exporter` will export health and performance metrics on `:9020/metrics`.
+These metrics are in Prometheus format for ease of parse. A sample grafana dashboard is at the root of this directory.
+
 #### Feature Requests / Issue Reporting
 
 This repo tracks feature requests and issues through Github Issues.

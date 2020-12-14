@@ -35,12 +35,16 @@ func main() {
 	if client.WithMetrics {
 		log.Println("Starting exposure of metrics on :9020/metrics")
 		http.Handle("/metrics", promhttp.Handler())
-		err := http.ListenAndServe(":9020", nil)
-		if err != nil {
-			log.Println("Could not start metrics endpoint")
-			log.Println(err)
-			log.Println("Continuing without exposing metrics")
-		}
+
+		go func() {
+			err := http.ListenAndServe(":9020", nil)
+			if err != nil {
+				log.Println("Could not start metrics endpoint")
+				log.Println(err)
+				log.Println("Continuing without exposing metrics")
+			}
+		}()
+
 	}
 
 	if client.CustomSourceName != "" {
