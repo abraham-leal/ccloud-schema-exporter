@@ -258,7 +258,7 @@ The following options are respected for custom sources / destinations as well:
 
 #### Monitoring
 
-When specified with `-withMetrics`, `ccloud-schema-exporter` will export health and performance metrics on `:9020/metrics`.
+When specified with `-withMetrics`, `ccloud-schema-exporter` will export health metrics on `:9020/metrics`.
 These metrics are in Prometheus format for ease of parse. A sample grafana dashboard is under the `Samples` directory.
 
 #### Feature Requests / Issue Reporting
