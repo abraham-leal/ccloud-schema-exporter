@@ -28,6 +28,7 @@ var SyncHardDeletes bool
 var ThisRun RunMode
 var PathToWrite string
 var CancelRun bool
+var WithMetrics bool
 var AllowList StringArrayFlag
 var DisallowList StringArrayFlag
 
