@@ -310,7 +310,7 @@ func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion(schema s
 	}
 	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
-	if WithMetrics {
+	if WithMetrics && res.StatusCode == 200{
 		schemasRegistered.Inc()
 	}
 
