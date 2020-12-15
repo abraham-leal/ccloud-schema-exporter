@@ -6,6 +6,8 @@ package client
 //
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"net/http"
 )
 
@@ -75,3 +77,25 @@ const (
 func (c Compatibility) String() string {
 	return [...]string{"BACKWARD", "BACKWARD_TRANSITIVE", "FORWARD", "FORWARD_TRANSITIVE", "FULL", "FULL_TRANSITIVE", "NONE"}[c]
 }
+
+// Custom Metrics
+var (
+	schemasRegistered = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "schema_exporter_registered_schemas",
+		Help: "The total number of registered schemas",
+	})
+)
+
+var (
+	schemasSoftDeleted = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "schema_exporter_softDeleted_schemas",
+		Help: "The total number of registered schemas",
+	})
+)
+
+var (
+	schemasHardDeleted = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "schema_exporter_hardDeleted_schemas",
+		Help: "The total number of registered schemas",
+	})
+)
