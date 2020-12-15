@@ -89,13 +89,13 @@ var (
 var (
 	schemasSoftDeleted = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "schema_exporter_softDeleted_schemas",
-		Help: "The total number of registered schemas",
+		Help: "The total number of soft deleted schemas",
 	})
 )
 
 var (
 	schemasHardDeleted = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "schema_exporter_hardDeleted_schemas",
-		Help: "The total number of registered schemas",
+		Help: "The total number of hard deleted schemas",
 	})
 )
