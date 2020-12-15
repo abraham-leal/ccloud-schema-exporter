@@ -45,7 +45,7 @@ docker run \
 
 ````
 
-A sample docker-compose is also provided under the `Samples` folder.
+A sample docker-compose is also provided under the `samples` folder.
 
 The docker image handles `-sync -syncDeletes -syncHardDeletes -withMetrics -noPrompt` continuous sync. For a one time export, it is recommended to use a release binary.
 
@@ -259,7 +259,7 @@ The following options are respected for custom sources / destinations as well:
 #### Monitoring
 
 When specified with `-withMetrics`, `ccloud-schema-exporter` will export health metrics on `:9020/metrics`.
-These metrics are in Prometheus format for ease of parse. A sample grafana dashboard is under the `Samples` directory.
+These metrics are in Prometheus format for ease of parse. A sample grafana dashboard is under the `samples` directory.
 
 #### Feature Requests / Issue Reporting
 
