@@ -75,9 +75,6 @@ func customSrcSync(diff map[string][]int64, dstClient *SchemaRegistryClient, cus
 						" and ID: " + strconv.FormatInt(id, 10) +
 						" and Type: " + stype)
 					dstClient.RegisterSchemaBySubjectAndIDAndVersion(schema, sbj, id, v, stype)
-					if WithMetrics {
-						schemasRegistered.Inc()
-					}
 				}
 			}
 		}
@@ -93,10 +90,6 @@ func customSrcSyncDeletes(destSubjects map[string][]int64, srcSubjects map[strin
 				if checkSubjectIsAllowed(sbj) {
 					dstClient.PerformSoftDelete(sbj, v)
 					dstClient.PerformHardDelete(sbj, v)
-					if WithMetrics {
-						schemasSoftDeleted.Inc()
-						schemasHardDeleted.Inc()
-					}
 				}
 			}
 		}
@@ -134,9 +127,6 @@ func RunCustomSourceBatch(dstClient *SchemaRegistryClient, customSrc CustomSourc
 					log.Printf("Registering schema: %s with version: %d and ID: %d and Type: %s",
 						sbj, v, id, stype)
 					dstClient.RegisterSchemaBySubjectAndIDAndVersion(schema, sbj, id, v, stype)
-					if WithMetrics {
-						schemasRegistered.Inc()
-					}
 				}
 
 			}

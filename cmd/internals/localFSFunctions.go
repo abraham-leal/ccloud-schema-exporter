@@ -67,9 +67,6 @@ func writeSchemaToSR(dstClient *SchemaRegistryClient, filepath string) {
 		check(err)
 		log.Printf("Registering Schema with Subject: %s. Version: %v, and ID: %v", subject, version, id)
 		dstClient.RegisterSchemaBySubjectAndIDAndVersion(string(rawSchema), subject, id, version, stype)
-		if WithMetrics {
-			schemasRegistered.Inc()
-		}
 	}
 }
 

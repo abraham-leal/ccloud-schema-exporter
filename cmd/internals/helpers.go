@@ -114,6 +114,14 @@ func handleDeletesHTTPResponse(body io.Reader, statusCode int, method string, en
 		log.Printf("ERROR: %s, HTTP Response: %s", errorMsg, string(body))
 	} else {
 		log.Println(fmt.Sprintf("%s deleted subject: %s, version: %d", reqType, subject, version))
+		if WithMetrics {
+			if reqType == "Soft" {
+				schemasSoftDeleted.Inc()
+			}
+			if reqType == "Hard" {
+				schemasHardDeleted.Inc()
+			}
+		}
 		return true
 	}
 	return false

@@ -68,9 +68,6 @@ func initialSync(diff map[string][]int64, srcClient *SchemaRegistryClient, destC
 					schema.Id,
 					schema.Version,
 					schema.SType)
-				if WithMetrics {
-					schemasRegistered.Inc()
-				}
 			}
 		}
 	}
@@ -83,9 +80,6 @@ func syncSoftDeletes(destSubjects map[string][]int64, srcSubjects map[string][]i
 		for subject, versions := range diff {
 			for _, v := range versions {
 				destClient.PerformSoftDelete(subject, v)
-				if WithMetrics {
-					schemasSoftDeleted.Inc()
-				}
 			}
 		}
 	}
@@ -100,9 +94,6 @@ func syncHardDeletes(srcClient *SchemaRegistryClient, destClient *SchemaRegistry
 					log.Printf("Discovered Hard Deleted Schema with ID %d, Subject %s, and Version: %d",
 						id, subject, version)
 					destClient.PerformHardDelete(subject, version)
-					if WithMetrics {
-						schemasHardDeleted.Inc()
-					}
 				}
 			}
 		}

@@ -33,9 +33,6 @@ func BatchExport(srcClient *SchemaRegistryClient, destClient *SchemaRegistryClie
 				schema.Id,
 				schema.Version,
 				schema.SType)
-			if WithMetrics {
-				schemasRegistered.Inc()
-			}
 		}
 	}
 }
