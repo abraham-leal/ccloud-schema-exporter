@@ -8,7 +8,9 @@ package main
 import (
 	"fmt"
 	"github.com/abraham-leal/ccloud-schema-exporter/cmd/internals"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 )
@@ -29,6 +31,21 @@ var customSrcFactory = map[string]client.CustomSource{
 func main() {
 
 	client.GetFlags()
+
+	if client.WithMetrics {
+		log.Println("Starting exposure of metrics on :9020/metrics")
+		http.Handle("/metrics", promhttp.Handler())
+
+		go func() {
+			err := http.ListenAndServe(":9020", nil)
+			if err != nil {
+				log.Println("Could not start metrics endpoint")
+				log.Println(err)
+				log.Println("Continuing without exposing metrics")
+			}
+		}()
+
+	}
 
 	if client.CustomSourceName != "" {
 

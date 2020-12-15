@@ -45,9 +45,9 @@ docker run \
 
 ````
 
-A sample docker-compose is also provided at the root of this directory.
+A sample docker-compose is also provided under the `samples` folder.
 
-The docker image handles `-sync -syncDeletes -syncHardDeletes -noPrompt` continuous sync. For a one time export, it is recommended to use a release binary.
+The docker image handles `-sync -syncDeletes -syncHardDeletes -withMetrics -noPrompt` continuous sync. For a one time export, it is recommended to use a release binary.
 
 If you'd like to pass custom flags, it is recommended to override the entry-point such as with `--entrypoint` with `/ccloud-schema-exporter` at the beginning of the override.
 
@@ -75,52 +75,54 @@ NOTE: Given that the exporter cannot determine a per-subject compatibility rule,
 ````
 Usage of ./ccloud-schema-exporter:
 
-    -allowList value
-        A comma delimited list of schema subjects to allow. It also accepts paths to a file containing a list of subjects.
-    -batchExport
-        Perform a one-time export of all schemas
-    -customDestination string
-        Name of the implementation to be used as a destination (same as mapping)
-    -customSource string
-        Name of the implementation to be used as a source (same as mapping)
-    -deleteAllFromDestination
-        Setting this will run a delete on all schemas written to the destination registry. No respect for allow/disallow lists.
-    -dest-sr-key string
-        API KEY for the Destination Schema Registry Cluster
-    -dest-sr-secret string
-        API SECRET for the Destination Schema Registry Cluster
-    -dest-sr-url string
-        Url to the Destination Schema Registry Cluster
-    -disallowList value
-        A comma delimited list of schema subjects to disallow. It also accepts paths to a file containing a list of subjects.
-    -fromLocalCopy
-        Registers all local schemas written by getLocalCopy. Defaults to a folder (SchemaRegistryBackup) in the current path of the binaries.
-    -getLocalCopy
-        Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path of the binaries.
-    -localPath string
-        Optional custom path for local functions. This must be an existing directory structure.
-    -noPrompt
-        Set this flag to avoid checks while running. Assure you have the destination SR to correct Mode and Compatibility.
-    -scrapeInterval int
-        Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds (default 60)
-    -src-sr-key string
-        API KEY for the Source Schema Registry Cluster
-    -src-sr-secret string
-        API SECRET for the Source Schema Registry Cluster
-    -src-sr-url string
-        Url to the Source Schema Registry Cluster
-    -sync
-        Sync schemas continuously
-    -syncDeletes
-        Setting this will sync soft deletes from the source cluster to the destination
-    -syncHardDeletes
-        Setting this will sync hard deletes from the source cluster to the destination
-    -timeout int
-        Timeout, in seconds, to use for all REST calls with the Schema Registries (default 60)
-    -usage
-        Print the usage of this tool
-    -version
-        Print the current version and exit
+  -allowList value
+    	A comma delimited list of schema subjects to allow. It also accepts paths to a file containing a list of subjects.
+  -batchExport
+    	Perform a one-time export of all schemas
+  -customDestination string
+    	Name of the implementation to be used as a destination (same as mapping)
+  -customSource string
+    	Name of the implementation to be used as a source (same as mapping)
+  -deleteAllFromDestination
+    	Setting this will run a delete on all schemas written to the destination registry. No respect for allow/disallow lists.
+  -dest-sr-key string
+    	API KEY for the Destination Schema Registry Cluster
+  -dest-sr-secret string
+    	API SECRET for the Destination Schema Registry Cluster
+  -dest-sr-url string
+    	Url to the Destination Schema Registry Cluster
+  -disallowList value
+    	A comma delimited list of schema subjects to disallow. It also accepts paths to a file containing a list of subjects.
+  -fromLocalCopy
+    	Registers all local schemas written by getLocalCopy. Defaults to a folder (SchemaRegistryBackup) in the current path of the binaries.
+  -getLocalCopy
+    	Perform a local back-up of all schemas in the source registry. Defaults to a folder (SchemaRegistryBackup) in the current path of the binaries.
+  -localPath string
+    	Optional custom path for local functions. This must be an existing directory structure.
+  -noPrompt
+    	Set this flag to avoid checks while running. Assure you have the destination SR to correct Mode and Compatibility.
+  -scrapeInterval int
+    	Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds (default 60)
+  -src-sr-key string
+    	API KEY for the Source Schema Registry Cluster
+  -src-sr-secret string
+    	API SECRET for the Source Schema Registry Cluster
+  -src-sr-url string
+    	Url to the Source Schema Registry Cluster
+  -sync
+    	Sync schemas continuously
+  -syncDeletes
+    	Setting this will sync soft deletes from the source cluster to the destination
+  -syncHardDeletes
+    	Setting this will sync hard deletes from the source cluster to the destination
+  -timeout int
+    	Timeout, in seconds, to use for all REST calls with the Schema Registries (default 60)
+  -usage
+    	Print the usage of this tool
+  -version
+    	Print the current version and exit
+  -withMetrics
+    	Exposes metrics for the application in Prometheus format on :9020/metrics
 
 ````
 
@@ -253,6 +255,11 @@ The following options are respected for custom sources / destinations as well:
   -syncDeletes
     	Setting this will sync soft deletes from the source cluster to the destination
 ````
+
+#### Monitoring
+
+When specified with `-withMetrics`, `ccloud-schema-exporter` will export health metrics on `:9020/metrics`.
+These metrics are in Prometheus format for ease of parse. A sample grafana dashboard is under the `samples` directory.
 
 #### Feature Requests / Issue Reporting
 

@@ -26,6 +26,7 @@ func GetFlags() {
 	flag.IntVar(&ScrapeInterval, "scrapeInterval", 60, "Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds")
 	flag.StringVar(&PathToWrite, "localPath", "",
 		"Optional custom path for local functions. This must be an existing directory structure.")
+	flag.BoolVar(&WithMetrics, "withMetrics", false, "Exposes metrics for the application in Prometheus format on :9020/metrics")
 	flag.Var(&AllowList, "allowList", "A comma delimited list of schema subjects to allow. It also accepts paths to a file containing a list of subjects.")
 	flag.Var(&DisallowList, "disallowList", "A comma delimited list of schema subjects to disallow. It also accepts paths to a file containing a list of subjects.")
 	versionFlag := flag.Bool("version", false, "Print the current version and exit")
