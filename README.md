@@ -3,7 +3,7 @@
 [![Build](https://travis-ci.com/abraham-leal/ccloud-schema-exporter.svg?branch=master)]() [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=abraham-leal_ccloud-schema-exporter&metric=alert_status)](https://sonarcloud.io/dashboard?id=abraham-leal_ccloud-schema-exporter)
 
 A tool to export schemas from a Confluent Cloud Schema Registry to another.
-This app supports three modes: `batchExport`, `sync`, `getLocalCopy`, and `fromLocalCopy`.
+This app supports four modes: `batchExport`, `sync`, `getLocalCopy`, and `fromLocalCopy`.
 
 - `batchExport` will do a one time migration between schema registries, then it will reset the destination registry to `READWRTIE` mode.
 - `sync` will continuously sync newly registered schemas into the destination registry.
@@ -154,11 +154,16 @@ NOTE: Lists aren't respected with the utility `-deleteAllFromDestination`
 Starting v1.1, `ccloud-schema-exporter` provides an efficient way of syncing hard deletions.
 In previous versions, this was done through inefficient lookups.
 
-Support for syncing hard deletions applies when the source and destination are both a Confluent Cloud Schema Registries.
+Support for syncing hard deletions applies when the source and destination are both a Confluent Cloud Schema Registry 
+or Confluent Platform 6.1+.
+
+NOTE: With regular `-syncDeletes`, the exporter will attempt to sync previously soft-deleted schemas to the destination.
+This functionality also only applies to Confluent Cloud or Confluent Platform 6.1+; However, if it is not able to perform this sync 
+it will just keep syncing soft deletes it detects in the future.
 
 #### Non-Interactive Run
 
-`ccloud-schema-exporter` is meant to be ran in a non-interactive way. 
+`ccloud-schema-exporter` is meant to be run in a non-interactive way. 
 However, it does include some checks to assure things go smoothly in the replication flow.
 You can disable these checks by setting the configuration `-noPrompt`.
 By default, the docker image has this in its entry point.
