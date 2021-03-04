@@ -14,7 +14,7 @@ If you are looking to migrate schemas between On-Premise and Confluent Cloud, ch
 [Confluent Replicator](https://docs.confluent.io/current/connect/kafka-connect-replicator/index.html).
 
 The exporter expects the following variables to be set in the environment to make the necessary calls:
-(In the case of `-getLocalCopy` and `-customDestination` it does not need `DST_*` variables; In the case of `-fromLocalCopy` it does not need `SRC_*` variables)
+(In the case of `-getLocalCopy` and `-customDestination` it does not need `DST_*` variables; In the case of `-fromLocalCopy` and `-customSource` it does not need `SRC_*` variables)
 
 - `SRC_SR_URL` : The URL for the source Schema Registry
 - `SRC_API_KEY` : The API KEY to be used to make calls to the source Schema Registry
@@ -214,7 +214,7 @@ type CustomDestination interface {
 }
 ````
 
-Golang isn't candid on runtime lookup of implementations of interfaces, so in order to make this implementation to the tool you must register it.
+Golang isn't candid on a runtime lookup of implementations of interfaces, so in order to make this implementation to the tool you must register it.
 To register your implementation, go into `cmd/ccloud-schema-exporter/ccloud-schema-exporter.go` and modify the following maps:
 
 ````
@@ -269,7 +269,7 @@ These metrics are in Prometheus format for ease of parse. A sample grafana dashb
 #### Feature Requests / Issue Reporting
 
 This repo tracks feature requests and issues through Github Issues.
-If you'd like to see something fixed that wasn't caught by testing, or you'd like to see a new feature, please feel free
+If you'd like to see something fixed that was not caught by testing, or you'd like to see a new feature, please feel free
 to file a Github issue in this repo, I'll review and answer at best effort.
 
 Additionally, if you'd like to contribute a fix/feature, please feel free to open a PR for review.

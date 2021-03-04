@@ -6,7 +6,7 @@ networks:
 
 services:
   zookeeper:
-    image: confluentinc/cp-zookeeper:5.5.1
+    image: confluentinc/cp-zookeeper:${CONFLUENT_VERSION}
     hostname: zookeeper
     container_name: zookeeper-internals
     ports:
@@ -16,7 +16,7 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
 
   broker:
-    image: confluentinc/cp-server:5.5.1
+    image: confluentinc/cp-server:${CONFLUENT_VERSION}
     hostname: broker
     container_name: broker-internals
     depends_on:
@@ -36,7 +36,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
 
   schema-registry-src:
-    image: confluentinc/cp-schema-registry:5.5.1
+    image: confluentinc/cp-schema-registry:${CONFLUENT_VERSION}
     hostname: schema-registry-src
     container_name: schema-registry-internals
     depends_on:
