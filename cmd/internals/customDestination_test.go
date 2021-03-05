@@ -21,7 +21,7 @@ func TestMainStackCustomDestination(t *testing.T) {
 
 func TCustomDestinationBatch(t *testing.T) {
 	log.Println("Testing Custom Destination in Batch Mode")
-	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, testingSubject, 10001, 1, "AVRO")
+	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, testingSubject, 10001, 1, "AVRO", []SchemaReference{})
 	myTestCustomDestination := NewSampleCustomDestination()
 
 	RunCustomDestinationBatch(testClient, &myTestCustomDestination)
@@ -39,7 +39,7 @@ func TCustomDestinationSync(t *testing.T) {
 	go RunCustomDestinationSync(testClient, &myTestCustomDestination)
 	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
 
-	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, newSubject, 10001, 1, "AVRO")
+	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, newSubject, 10001, 1, "AVRO", []SchemaReference{})
 	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
 	_, exists1 := myTestCustomDestination.inMemState[testingSubject]
 	_, exists2 := myTestCustomDestination.inMemState[newSubject]

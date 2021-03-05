@@ -22,14 +22,14 @@ func TestMainStackHelpers(t *testing.T) {
 	t.Run("TGetIDDiff", func(t *testing.T) { TGetIDDiff(t) })
 }
 
-func TisInSlice (t *testing.T) {
-	sliceOne := []int64{1,2,3,4,5}
+func TisInSlice(t *testing.T) {
+	sliceOne := []int64{1, 2, 3, 4, 5}
 
 	assert.True(t, isInSlice(3, sliceOne))
 	assert.True(t, !isInSlice(6, sliceOne))
 }
 
-func TcheckSubjectIsAllowed (t *testing.T) {
+func TcheckSubjectIsAllowed(t *testing.T) {
 	AllowList = map[string]bool{
 		"testingSubjectKey": true,
 		"SomeOtherValue":    true,
@@ -48,8 +48,7 @@ func TcheckSubjectIsAllowed (t *testing.T) {
 
 }
 
-
-func TfilterListedSubjects (t *testing.T) {
+func TfilterListedSubjects(t *testing.T) {
 
 	AllowList = map[string]bool{
 		"testingSubjectKey": true,
@@ -74,10 +73,10 @@ func TfilterListedSubjects (t *testing.T) {
 	AllowList = nil
 	DisallowList = nil
 
-	assert.True(t, reflect.DeepEqual(result,expected))
+	assert.True(t, reflect.DeepEqual(result, expected))
 }
 
-func TfilterListedSubjectsVersions (t *testing.T) {
+func TfilterListedSubjectsVersions(t *testing.T) {
 	AllowList = map[string]bool{
 		"testingSubjectKey": true,
 		"SomeOtherValue":    true,
@@ -103,91 +102,91 @@ func TfilterListedSubjectsVersions (t *testing.T) {
 	AllowList = nil
 	DisallowList = nil
 
-	assert.True(t, reflect.DeepEqual(result,expected))
+	assert.True(t, reflect.DeepEqual(result, expected))
 
 }
 
-func TfilterIDs (t *testing.T) {
+func TfilterIDs(t *testing.T) {
 
 	AllowList = map[string]bool{
 		"testingSubjectKey": true,
-		"SomeOtherValue" : true,
+		"SomeOtherValue":    true,
 	}
 
 	DisallowList = map[string]bool{
 		"someValuePartTwo": true,
-		"SomeOtherValue" : true,
+		"SomeOtherValue":   true,
 	}
 
 	toFilter := map[int64]map[string][]int64{
-		1001: {"testingSubjectKey" : {1,2,3}, "someValuePartTwo" : {1,2}},
-		5000: {"SomeOtherValue" : {1,2}},
+		1001: {"testingSubjectKey": {1, 2, 3}, "someValuePartTwo": {1, 2}},
+		5000: {"SomeOtherValue": {1, 2}},
 	}
 
 	result := filterIDs(toFilter)
 
 	expected := map[int64]map[string][]int64{
-		1001: {"testingSubjectKey" : {1,2,3}},
+		1001: {"testingSubjectKey": {1, 2, 3}},
 	}
 
 	AllowList = nil
 	DisallowList = nil
 
-	assert.True(t, reflect.DeepEqual(result,expected))
+	assert.True(t, reflect.DeepEqual(result, expected))
 }
 
-func TGetSubjectDiff (t *testing.T) {
+func TGetSubjectDiff(t *testing.T) {
 	subjectMapOne := map[string][]int64{
-		"someValue" : {1,2,3},
-		"SomeOtherValue" : {1,2},
+		"someValue":      {1, 2, 3},
+		"SomeOtherValue": {1, 2},
 	}
 
 	subjectMapTwo := map[string][]int64{
-		"someValue" : {1,3},
-		"SomeOtherValue" : {2},
+		"someValue":      {1, 3},
+		"SomeOtherValue": {2},
 	}
 
-	result := GetSubjectDiff(subjectMapOne,subjectMapTwo)
+	result := GetSubjectDiff(subjectMapOne, subjectMapTwo)
 
 	expected := map[string][]int64{
-		"someValue" : {2},
-		"SomeOtherValue" : {1},
+		"someValue":      {2},
+		"SomeOtherValue": {1},
 	}
 
 	// Assert values that are contained in left but not right are returned
-	assert.True(t,reflect.DeepEqual(expected,result))
+	assert.True(t, reflect.DeepEqual(expected, result))
 }
 
 func TGetVersionsDiff(t *testing.T) {
-	versionArrayOne := []int64{1,2,3}
-	versionArrayTwo := []int64{1,3}
+	versionArrayOne := []int64{1, 2, 3}
+	versionArrayTwo := []int64{1, 3}
 
-	result := GetVersionsDiff(versionArrayOne,versionArrayTwo)
+	result := GetVersionsDiff(versionArrayOne, versionArrayTwo)
 
 	expected := []int64{2}
 
 	// Assert values that are contained in left but not right are returned
-	assert.Equal(t,expected,result)
+	assert.Equal(t, expected, result)
 }
 
-func TGetIDDiff (t *testing.T) {
+func TGetIDDiff(t *testing.T) {
 
 	idMapOne := map[int64]map[string][]int64{
-		1001: {"someValue" : {1,2,3}, "someValuePartTwo" : {1,2}},
-		5000: {"SomeOtherValue" : {1,2}},
+		1001: {"someValue": {1, 2, 3}, "someValuePartTwo": {1, 2}},
+		5000: {"SomeOtherValue": {1, 2}},
 	}
 
 	idMapTwo := map[int64]map[string][]int64{
-		1001: {"someValue" : {1,3}, "someValuePartTwo" : {1}},
-		5000: {"SomeOtherValue" : {2}},
+		1001: {"someValue": {1, 3}, "someValuePartTwo": {1}},
+		5000: {"SomeOtherValue": {2}},
 	}
 
 	results := GetIDDiff(idMapOne, idMapTwo)
 
 	expected := map[int64]map[string][]int64{
-		1001: {"someValue" : {2}, "someValuePartTwo" : {2}},
-		5000: {"SomeOtherValue" : {1}},
+		1001: {"someValue": {2}, "someValuePartTwo": {2}},
+		5000: {"SomeOtherValue": {1}},
 	}
 
-	assert.True(t, reflect.DeepEqual(expected,results))
+	assert.True(t, reflect.DeepEqual(expected, results))
 }

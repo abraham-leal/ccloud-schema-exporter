@@ -65,7 +65,7 @@ func customSrcSync(diff map[string][]int64, dstClient *SchemaRegistryClient, cus
 		log.Println("Custom Source has values that Schema Registry does not, syncing...")
 		for sbj, versions := range diff {
 			for _, v := range versions {
-				id, stype, schema, err := customSrc.GetSchema(sbj, v)
+				id, stype, schema, references, err := customSrc.GetSchema(sbj, v)
 				if err != nil {
 					log.Println("Could not retrieve schema from custom source")
 				}
@@ -74,7 +74,7 @@ func customSrcSync(diff map[string][]int64, dstClient *SchemaRegistryClient, cus
 						" with version: " + strconv.FormatInt(v, 10) +
 						" and ID: " + strconv.FormatInt(id, 10) +
 						" and Type: " + stype)
-					dstClient.RegisterSchemaBySubjectAndIDAndVersion(schema, sbj, id, v, stype)
+					dstClient.RegisterSchemaBySubjectAndIDAndVersion(schema, sbj, id, v, stype, references)
 				}
 			}
 		}
@@ -119,14 +119,14 @@ func RunCustomSourceBatch(dstClient *SchemaRegistryClient, customSrc CustomSourc
 			return
 		}
 		for _, v := range srcVersions {
-			id, stype, schema, err := customSrc.GetSchema(sbj, v)
+			id, stype, schema, references, err := customSrc.GetSchema(sbj, v)
 			if err != nil {
 				log.Println("Could not retrieve schema from custom source")
 			} else {
 				if checkSubjectIsAllowed(sbj) {
 					log.Printf("Registering schema: %s with version: %d and ID: %d and Type: %s",
 						sbj, v, id, stype)
-					dstClient.RegisterSchemaBySubjectAndIDAndVersion(schema, sbj, id, v, stype)
+					dstClient.RegisterSchemaBySubjectAndIDAndVersion(schema, sbj, id, v, stype, references)
 				}
 
 			}
@@ -189,13 +189,13 @@ func (iM inMemRegistry) SetUp() error {
 	return nil
 }
 
-func (iM inMemRegistry) GetSchema(sbj string, version int64) (id int64, stype string, schema string, err error) {
+func (iM inMemRegistry) GetSchema(sbj string, version int64) (id int64, stype string, schema string, references []SchemaReference, err error) {
 	for _, schemaRecord := range iM.inMemSchemas {
 		if schemaRecord.Subject == sbj && schemaRecord.Version == version {
-			return schemaRecord.Id, schemaRecord.SType, schemaRecord.Schema, nil
+			return schemaRecord.Id, schemaRecord.SType, schemaRecord.Schema, nil, nil
 		}
 	}
-	return 0, "", "", fmt.Errorf("schema not found")
+	return 0, "", "", nil, fmt.Errorf("schema not found")
 }
 
 func (iM inMemRegistry) GetSourceState() (map[string][]int64, error) {
@@ -247,7 +247,7 @@ func (ap *ApicurioSource) SetUp() error {
 	return nil
 }
 
-func (ap *ApicurioSource) GetSchema(subject string, version int64) (id int64, stype string, schema string, err error) {
+func (ap *ApicurioSource) GetSchema(subject string, version int64) (id int64, stype string, schema string, references []SchemaReference, err error) {
 	artifactID, isThere := ap.referenceName[subject]
 	if !isThere {
 		log.Println("State snapshot does not match new requests. Allow a new run for a better sync.")
@@ -282,7 +282,7 @@ func (ap *ApicurioSource) GetSchema(subject string, version int64) (id int64, st
 	checkDontFail(err)
 	schemaResponse.Body.Close()
 
-	return metaResponseContainer.GlobalId, metaResponseContainer.Stype, string(schemaBody), nil
+	return metaResponseContainer.GlobalId, metaResponseContainer.Stype, string(schemaBody), references, nil
 }
 
 func (ap *ApicurioSource) GetSourceState() (map[string][]int64, error) {

@@ -15,9 +15,9 @@ import (
 
 // A client that can perform actions against a backing Schema Registry
 type SchemaRegistryClient struct {
-	SRUrl              string
-	SRApiKey           string
-	SRApiSecret        string
+	SRUrl       string
+	SRApiKey    string
+	SRApiSecret string
 }
 
 /*
@@ -46,7 +46,7 @@ type CustomSource interface {
 	// Perform any set-up behavior before start of sync/batch export
 	SetUp() error
 	// An implementation should handle the retrieval of a schema from the source.
-	GetSchema(subject string, version int64) (id int64, stype string, schema string, err error)
+	GetSchema(subject string, version int64) (id int64, stype string, schema string, references []SchemaReference, err error)
 	// An implementation should be able to send exactly one map describing the state of the source
 	// This map should be minimal. Describing only the Subject and Versions that exist.
 	GetSourceState() (map[string][]int64, error)
@@ -56,11 +56,22 @@ type CustomSource interface {
 
 // Holding struct that describes a schema record
 type SchemaRecord struct {
+	Subject    string            `json:"subject"`
+	Schema     string            `json:"schema"`
+	SType      string            `json:"schemaType"`
+	Version    int64             `json:"version"`
+	Id         int64             `json:"id"`
+	References []SchemaReference `json:"references"`
+}
+
+type SchemaReference struct {
+	Name    string `json:"name"`
 	Subject string `json:"subject"`
-	Schema  string `json:"schema"`
-	SType   string `json:"schemaType"`
 	Version int64  `json:"version"`
-	Id      int64  `json:"id"`
+}
+
+type SchemaAlreadyRegisteredResponse struct {
+	Id int64 `json:"id"`
 }
 
 //Constructor to assure Type-less schemas get registered with Avro
@@ -72,20 +83,31 @@ func (srs SchemaRecord) setTypeIfEmpty() SchemaRecord {
 	return srs
 }
 
+//Constructor to assure Reference-less schemas get registered
+func (srs SchemaRecord) setReferenceIfEmpty() SchemaRecord {
+	if len(srs.References) == 0 {
+		srs.References = []SchemaReference{}
+	}
+
+	return srs
+}
+
 // Holding struct for registering a schema in an SR compliant way
 type SchemaToRegister struct {
-	Schema  string `json:"schema"`
-	Id      int64  `json:"id,omitempty"`
-	Version int64  `json:"version,omitempty"`
-	SType   string `json:"schemaType"`
+	Schema     string            `json:"schema"`
+	Id         int64             `json:"id,omitempty"`
+	Version    int64             `json:"version,omitempty"`
+	SType      string            `json:"schemaType"`
+	References []SchemaReference `json:"references"`
 }
 
 // Holding struct for retrieving a schema
 type SchemaExtraction struct {
-	Schema  string `json:"schema"`
-	Id      int64  `json:"id"`
-	Version int64  `json:"version"`
-	Subject string `json:"subject"`
+	Schema     string            `json:"schema"`
+	Id         int64             `json:"id"`
+	Version    int64             `json:"version"`
+	Subject    string            `json:"subject"`
+	References []SchemaReference `json:"references"`
 }
 
 type ModeRecord struct {
@@ -106,6 +128,11 @@ type SubjectVersion struct {
 	Version int64  `json:"version"`
 }
 
+type ErrorMessage struct {
+	ErrorCode    int64  `json:"error_code"`
+	ErrorMessage string `json:"message"`
+}
+
 type StringArrayFlag map[string]bool
 
 func (i *StringArrayFlag) String() string {
@@ -114,10 +141,9 @@ func (i *StringArrayFlag) String() string {
 
 func (i *StringArrayFlag) Set(value string) error {
 	currentPath, _ := os.Getwd()
-	path := CheckPath(value, currentPath)
 
-	if fileExists(path) {
-		f, err := ioutil.ReadFile(path)
+	if fileExists(value) {
+		f, err := ioutil.ReadFile(CheckPath(value, currentPath))
 		if err != nil {
 			panic(err)
 		}

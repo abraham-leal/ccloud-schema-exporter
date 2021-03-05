@@ -18,7 +18,7 @@ func Sync(srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
 
 	// Set up soft Deleted IDs in destination for interpretation by the destination registry
 	if SyncDeletes {
-		syncExistingSoftDeletedSubjects(srcClient,destClient)
+		syncExistingSoftDeletedSubjects(srcClient, destClient)
 	}
 
 	//Begin sync
@@ -59,6 +59,7 @@ func initialSync(diff map[string][]int64, srcClient *SchemaRegistryClient, destC
 		for subject, versions := range diff {
 			for _, v := range versions {
 				schema := srcClient.GetSchema(subject, v, false)
+				RegisterReferences(schema, srcClient, destClient, false)
 				log.Println("Registering new schema: " + schema.Subject +
 					" with version: " + strconv.FormatInt(schema.Version, 10) +
 					" and ID: " + strconv.FormatInt(schema.Id, 10) +
@@ -67,7 +68,8 @@ func initialSync(diff map[string][]int64, srcClient *SchemaRegistryClient, destC
 					schema.Subject,
 					schema.Id,
 					schema.Version,
-					schema.SType)
+					schema.SType,
+					schema.References)
 			}
 		}
 	}
@@ -86,7 +88,7 @@ func syncSoftDeletes(destSubjects map[string][]int64, srcSubjects map[string][]i
 }
 
 func syncHardDeletes(srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
-	permDel := GetIDDiff(destClient.GetSoftDeletedIDs(),srcClient.GetSoftDeletedIDs())
+	permDel := GetIDDiff(destClient.GetSoftDeletedIDs(), srcClient.GetSoftDeletedIDs())
 	if len(permDel) != 0 {
 		for id, subjectVersionsMap := range permDel {
 			for subject, versions := range subjectVersionsMap {
@@ -100,17 +102,17 @@ func syncHardDeletes(srcClient *SchemaRegistryClient, destClient *SchemaRegistry
 	}
 }
 
-func syncExistingSoftDeletedSubjects (srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
-	softDel := GetIDDiff(srcClient.GetSoftDeletedIDs(),destClient.GetSoftDeletedIDs())
+func syncExistingSoftDeletedSubjects(srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient) {
+	softDel := GetIDDiff(srcClient.GetSoftDeletedIDs(), destClient.GetSoftDeletedIDs())
 	if len(softDel) != 0 {
 		log.Println("There are soft Deleted IDs in the source. Sinking to the destination at startup...")
-		for _ , meta := range softDel {
+		for _, meta := range softDel {
 			for sbj, versions := range meta {
 				for _, version := range versions {
-					softDeletedSchema := srcClient.GetSchema(sbj,version,true)
+					softDeletedSchema := srcClient.GetSchema(sbj, version, true)
 					destClient.RegisterSchemaBySubjectAndIDAndVersion(softDeletedSchema.Schema,
-						softDeletedSchema.Subject,softDeletedSchema.Id,softDeletedSchema.Version,softDeletedSchema.SType)
-					destClient.PerformSoftDelete(softDeletedSchema.Subject,softDeletedSchema.Version)
+						softDeletedSchema.Subject, softDeletedSchema.Id, softDeletedSchema.Version, softDeletedSchema.SType, softDeletedSchema.References)
+					destClient.PerformSoftDelete(softDeletedSchema.Subject, softDeletedSchema.Version)
 				}
 			}
 		}

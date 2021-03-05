@@ -5,7 +5,6 @@ package integration
 // Copyright 2020 Abraham Leal
 //
 
-
 import (
 	client "github.com/abraham-leal/ccloud-schema-exporter/cmd/internals"
 	"github.com/stretchr/testify/assert"
@@ -28,6 +27,9 @@ var softDeleteLogMessage = "Testing soft delete sync"
 var newSchema = "{\"type\":\"record\",\"name\":\"value_newnew\",\"namespace\":\"com.mycorp.mynamespace\",\"doc\":\"Sample schema to help you get started.\",\"fields\":[{\"name\":\"this\",\"type\":\"int\",\"doc\":\"The int type is a 32-bit signed integer.\"},{\"default\": null,\"name\": \"onefield\",\"type\": [\"null\",\"string\"]}]}"
 var localRelativePath = "/testingLocalBackupRelativePath"
 var localAbsPath = "/tmp/testingLocalBackupAbsPath"
+var registrationCount = 0
+var registeredSubjectCount = 0
+var seenSubjects map[string]string
 
 func TestMain(m *testing.M) {
 	setup()
@@ -56,7 +58,7 @@ func TestExportMode(t *testing.T) {
 	log.Println("Test Export Mode!")
 
 	setImportMode()
-	setupSource()
+	cleanup()
 
 	client.BatchExport(testClientSrc, testClientDst)
 
@@ -74,7 +76,6 @@ func TestExportMode(t *testing.T) {
 	cleanup()
 
 	log.Println("Test Export Mode with Allow Lists!")
-	setupSource()
 	client.AllowList = map[string]bool{
 		testingSubjectKey: true,
 	}
@@ -85,13 +86,18 @@ func TestExportMode(t *testing.T) {
 	dstSubjects = <-dstChan
 
 	_, contains := dstSubjects[testingSubjectKey]
-	assert.Equal(t, 1, len(dstSubjects))
+	assert.Equal(t, len(client.AllowList), len(dstSubjects))
 	assert.True(t, contains)
 
 	cleanup()
 
 	log.Println("Test Export Mode with Disallow Lists!")
-	setupSource()
+
+	//Get length of subjects without filters
+	client.AllowList = nil
+	client.DisallowList = nil
+	go testClientDst.GetSubjectsWithVersions(dstChan)
+	dstSubjectsAll := <-dstChan
 
 	client.AllowList = nil
 	client.DisallowList = map[string]bool{
@@ -103,22 +109,21 @@ func TestExportMode(t *testing.T) {
 	dstSubjects = <-dstChan
 
 	_, contains = dstSubjects[testingSubjectKey]
-	assert.Equal(t, 1, len(dstSubjects))
+	assert.Equal(t, len(dstSubjectsAll)-len(client.DisallowList), len(dstSubjects))
 	assert.True(t, contains)
-
-	cleanup()
-
 }
 
 func TestLocalMode(t *testing.T) {
 	log.Println("Test Local Mode!")
 
-	setupSource()
+	setImportMode()
+	cleanup()
 
 	client.DisallowList = nil
 	client.AllowList = nil
 
-	testLocalCopy(t, 6)
+	// 3 versions + 3 versions + 1 version referenced + 1 version referencer
+	testLocalCopy(t, registrationCount)
 
 	log.Println("Test Local Mode With Allow Lists!")
 
@@ -127,7 +132,19 @@ func TestLocalMode(t *testing.T) {
 		testingSubjectValue: true,
 	}
 
-	testLocalCopy(t, 3)
+	dstChan := make(chan map[string][]int64)
+	go testClientDst.GetSubjectsWithVersions(dstChan)
+	dstSubjects := <-dstChan
+
+	filteredSubjectCount := 0
+	for _, versions := range dstSubjects {
+		for _, _ = range versions {
+			filteredSubjectCount = filteredSubjectCount + 1
+		}
+	}
+
+	// 3 versions
+	testLocalCopy(t, filteredSubjectCount)
 
 	log.Println("Test Local Mode With Disallow Lists!")
 
@@ -136,8 +153,18 @@ func TestLocalMode(t *testing.T) {
 		testingSubjectValue: true,
 	}
 
-	testLocalCopy(t, 3)
+	go testClientDst.GetSubjectsWithVersions(dstChan)
+	dstSubjects = <-dstChan
 
+	filteredSubjectCount = 0
+	for _, versions := range dstSubjects {
+		for _, _ = range versions {
+			filteredSubjectCount = filteredSubjectCount + 1
+		}
+	}
+
+	// 3 versions + 1 version referenced + 1 version referencer
+	testLocalCopy(t, filteredSubjectCount)
 }
 
 func TestSyncMode(t *testing.T) {
@@ -148,9 +175,9 @@ func TestSyncMode(t *testing.T) {
 	client.DisallowList = nil
 
 	setImportMode()
-	setupSource()
+	cleanup()
 
-	commonSyncTest(t, 2)
+	commonSyncTest(t, registeredSubjectCount)
 
 	killAsyncRoutine()
 	cleanup()
@@ -163,22 +190,22 @@ func TestSyncMode(t *testing.T) {
 	}
 	client.DisallowList = nil
 
-	commonSyncTest(t, 1)
+	commonSyncTest(t, len(client.AllowList))
 	killAsyncRoutine()
+
 	cleanup()
 
 	log.Println("Test Sync Mode With Disallow Lists!")
 	client.CancelRun = false
 
+	// Filter the test
 	client.AllowList = nil
 	client.DisallowList = map[string]bool{
 		testingSubjectValue: true,
 	}
 
-	commonSyncTest(t, 1)
+	commonSyncTest(t, registeredSubjectCount-len(client.DisallowList))
 	killAsyncRoutine()
-	cleanup()
-
 }
 
 /*
@@ -200,6 +227,10 @@ func killAsyncRoutine() {
 
 func cleanup() {
 	log.Println("Clean up SRs")
+	registeredSubjectCount = 0
+	registrationCount = 0
+	seenSubjects = map[string]string{}
+
 	testClientDst.DeleteAllSubjectsPermanently()
 	testClientSrc.DeleteAllSubjectsPermanently()
 	time.Sleep(time.Duration(3) * time.Second) // Allow time for deletes to complete
@@ -231,6 +262,9 @@ func setupSource() {
 
 	schema6 := "{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
 
+	schemaToReference := "{\"type\":\"record\",\"name\":\"reference\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"}]}"
+
+	schemaReferencing := "{\"type\":\"record\",\"name\":\"sampleRecordreferencing\",\"namespace\":\"com.mycorp.somethinghere\",\"fields\":[{\"name\":\"reference\",\"type\":\"com.reference.reference\"}]}"
 	schemas := []string{schema, schema2, schema3, schema4, schema5, schema6}
 	counter := 1
 
@@ -245,17 +279,37 @@ func setupSource() {
 				Id:      id,
 			}
 
-			testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(
+			registerAtSource(
 				currentRecord.Schema,
 				currentRecord.Subject,
 				currentRecord.Id,
 				currentRecord.Version,
-				"AVRO")
+				"AVRO",
+				nil)
 
-			log.Printf("Registering schema with subject %s, version %d, and id %d", currentRecord.Subject, currentRecord.Version, currentRecord.Id)
 			id = id + 1
 			counter++
 		}
+	}
+
+	// Register referencing test
+	registerAtSource(schemaToReference, "reference", 12345, 1, "AVRO", nil)
+	referenceStruct := client.SchemaReference{
+		Name:    "com.reference.reference",
+		Subject: "reference",
+		Version: 1,
+	}
+	registerAtSource(schemaReferencing, "someReferencingSubject", 12346, 1, "AVRO", []client.SchemaReference{referenceStruct})
+}
+
+func registerAtSource (schema string, subject string, id int64, version int64, SType string, references []client.SchemaReference) {
+	log.Printf("Registering schema with subject %s, version %d, and id %d", subject, version, id)
+	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(schema, subject, id, version, SType, references)
+	registrationCount++
+	_, contains := seenSubjects[subject]
+	if !contains {
+		seenSubjects[subject] = ""
+		registeredSubjectCount++
 	}
 }
 
@@ -299,7 +353,7 @@ func testSoftDelete(t *testing.T, lenOfDestSubjects int) {
 	printSubjectTestResult(srcSubjects, destSubjects)
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
-	assert.True(t, len(destSubjects) == lenOfDestSubjects)
+	assert.Equal(t, lenOfDestSubjects, len(destSubjects))
 
 	testClientSrc.PerformHardDelete(testingSubjectKey, 1)
 	testClientDst.PerformHardDelete(testingSubjectKey, 1)
@@ -323,7 +377,7 @@ func testInitialSync(t *testing.T, lenOfDestSubjects int) {
 	printSubjectTestResult(srcSubjects, destSubjects)
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
-	assert.True(t, len(destSubjects) == lenOfDestSubjects)
+	assert.Equal(t, lenOfDestSubjects, len(destSubjects))
 }
 
 func testRegistrationSync(t *testing.T, lenOfDestSubjects int) {
@@ -343,8 +397,8 @@ func testRegistrationSync(t *testing.T, lenOfDestSubjects int) {
 		Version: 4,
 		Id:      100507,
 	}
-	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(newRegister.Schema,
-		newRegister.Subject, newRegister.Id, newRegister.Version, newRegister.SType)
+	registerAtSource(newRegister.Schema,
+		newRegister.Subject, newRegister.Id, newRegister.Version, newRegister.SType, nil)
 
 	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 
@@ -358,7 +412,7 @@ func testRegistrationSync(t *testing.T, lenOfDestSubjects int) {
 	printSubjectTestResult(srcSubjects, destSubjects)
 
 	assert.True(t, reflect.DeepEqual(srcSubjects, destSubjects))
-	assert.True(t, len(destSubjects) == lenOfDestSubjects)
+	assert.Equal(t, lenOfDestSubjects, len(destSubjects))
 }
 
 func testLocalCopy(t *testing.T, expectedFilesToWrite int) {
@@ -383,10 +437,19 @@ func testLocalCopy(t *testing.T, expectedFilesToWrite int) {
 	}
 
 	dstSubj := client.GetCurrentSubjectState(testClientDst)
+
+	count := 0
+	// Get total schema count
+	for _, versions := range dstSubj {
+		for _, _ = range versions {
+			count = count + 1
+		}
+	}
+
 	testClientDst.DeleteAllSubjectsPermanently()
 
-	assert.True(t, len(dstSubj) == expectedFilesToWrite/3)
-	assert.True(t, len(files) == expectedFilesToWrite)
+	assert.Equal(t, expectedFilesToWrite, count)
+	assert.Equal(t, expectedFilesToWrite, len(files))
 
 	// Test Absolute Paths
 	_ = os.Mkdir(localAbsPath, 0755)
@@ -395,12 +458,21 @@ func testLocalCopy(t *testing.T, expectedFilesToWrite int) {
 	client.WriteFromFS(testClientDst, localAbsPath, currentPath)
 
 	dstSubj = client.GetCurrentSubjectState(testClientDst)
+
+	count = 0
+	// Get total schema count
+	for _, versions := range dstSubj {
+		for _, _ = range versions {
+			count = count + 1
+		}
+	}
+
 	testClientDst.DeleteAllSubjectsPermanently()
 
 	files2, _ := ioutil.ReadDir(localAbsPath)
 
-	assert.True(t, len(dstSubj) == expectedFilesToWrite/3)
-	assert.True(t, len(files2) == expectedFilesToWrite)
+	assert.Equal(t, expectedFilesToWrite, count)
+	assert.Equal(t, expectedFilesToWrite, len(files2))
 
 }
 
