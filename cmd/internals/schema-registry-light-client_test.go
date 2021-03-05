@@ -162,8 +162,8 @@ func TGetSoftDeletedIDs(t *testing.T) {
 	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, newSubject, 10001, 1, "AVRO", []SchemaReference{})
 	testClient.PerformSoftDelete(newSubject, 1)
 	result := testClient.GetSoftDeletedIDs()
-	expected := map[int64]map[string]int64{
-		10001: {newSubject: 1}}
+	expected := map[int64]map[string][]int64{
+		10001: {newSubject: {1}}}
 
 	testClient.PerformHardDelete(newSubject, 1)
 	assert.Equal(t, expected, result)
