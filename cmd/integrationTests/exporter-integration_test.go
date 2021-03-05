@@ -302,7 +302,7 @@ func setupSource() {
 	registerAtSource(schemaReferencing, "someReferencingSubject", 12346, 1, "AVRO", []client.SchemaReference{referenceStruct})
 }
 
-func registerAtSource (schema string, subject string, id int64, version int64, SType string, references []client.SchemaReference) {
+func registerAtSource(schema string, subject string, id int64, version int64, SType string, references []client.SchemaReference) {
 	log.Printf("Registering schema with subject %s, version %d, and id %d", subject, version, id)
 	testClientSrc.RegisterSchemaBySubjectAndIDAndVersion(schema, subject, id, version, SType, references)
 	registrationCount++

@@ -488,7 +488,7 @@ func (src *SchemaRegistryClient) getSchemaList(deleted bool) map[int64]map[strin
 
 func (src *SchemaRegistryClient) subjectExists(subject string) bool {
 	endpoint := fmt.Sprintf("%s/subjects/%s", src.SRUrl, subject)
-	sbjReq := GetNewRequest("GET", endpoint, src.SRApiKey,src.SRApiSecret, nil,nil)
+	sbjReq := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 	response, err := httpClient.Do(sbjReq)
 	check(err)
 	defer response.Body.Close()
