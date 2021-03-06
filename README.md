@@ -2,6 +2,21 @@
 
 [![Build](https://travis-ci.com/abraham-leal/ccloud-schema-exporter.svg?branch=master)]() [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=abraham-leal_ccloud-schema-exporter&metric=alert_status)](https://sonarcloud.io/dashboard?id=abraham-leal_ccloud-schema-exporter)
 
+## Overview
+
+1. [Build](#build)
+2. [Docker Run](#DockerRun)
+3. [Local Run](#localrun)
+    - [Run Options](#runoptions)
+    - [Sample Run](#howtouse)
+    - [Filtering the export](#filters)
+    - [Note on Hard Deletion Sync](#harddelnote)
+    - [Non-Interactive Runs](#noninteractive)
+    - [Extendability: Custom Sources and Desinations](#extendability)
+    - [Monitoring](#monitoring)
+4. [Feature Requests and Bug Reporting](#features)
+    
+
 A tool to export schemas from a Confluent Cloud Schema Registry to another.
 This app supports four modes: `batchExport`, `sync`, `getLocalCopy`, and `fromLocalCopy`.
 
@@ -25,14 +40,14 @@ The exporter expects the following variables to be set in the environment to mak
 
 It is also possible to define the credentials through command flags. If both are defined, the flags take precedence.
 
-## Build
+## Build <a name="build"></a>
 ````
 git clone https://github.com/abraham-leal/ccloud-schema-exporter
 cd ccloud-schema-exporter
 go build ./cmd/ccloud-schema-exporter/ccloud-schema-exporter.go 
 ````
 
-## Docker Run
+## Docker Run <a name="dockerRun"></a>
 ````
 docker run \
   -e SRC_SR_URL=$SRC_SR_URL \
@@ -54,7 +69,7 @@ If you'd like to pass custom flags, it is recommended to override the entry-poin
 For Docker, the `latest` tag will build directly from master. The master branch of this project is kept non-breaking;
 However, for stable images tag a release.
 
-## Run
+## Run <a name="localrun"></a>
 - `./ccloud-schema-exporter -batchExport` : Running the app with this flag will perform a batch export.
 Starting v1.1, `-batchExport` can be declared with `-syncDeletes` to perform an export of soft deleted schemas. 
 - `./ccloud-schema-exporter -sync` : Running the app with this flag will start a continuous sync 
@@ -70,7 +85,7 @@ When multiple flags are applied, prevalence is `sync` -> `batchExport` -> `getLo
 
 NOTE: Given that the exporter cannot determine a per-subject compatibility rule, it is recommended to set the destination schema registry compatibility level to `NONE` on first sync and restore it to the source's level afterwards.
 
-### Options
+### Options <a name="runoptions"></a>
 
 ````
 Usage of ./ccloud-schema-exporter:
@@ -126,7 +141,7 @@ Usage of ./ccloud-schema-exporter:
 
 ````
 
-#### Example Usage 
+### Example Usage <a name="howtouse"></a>
 ````
 export SRC_SR_URL=XXXX
 export SRC_API_KEY=XXXX
@@ -137,7 +152,7 @@ export DST_API_SECRET=XXXX
 ./ccloud-schema-exporter <-sync | -batchExport | -getLocalCopy | -fromLocalCopy>
 ````
 
-#### Filtering the export
+### Filtering the export <a name="filters"></a>
 
 It is now possible to filter the subjects which are sync-ed in all modes (`<-sync | -batchExport | -getLocalCopy | -fromLocalCopy>`).
 Setting `-allowList` or/and `-disallowList` flags will accept either a comma delimited string, or a file containing
@@ -149,7 +164,7 @@ A subject specified in `-disallowList` and `-allowList` will be disallowed by de
 
 NOTE: Lists aren't respected with the utility `-deleteAllFromDestination`
 
-#### A note on syncing hard deletions
+### A note on syncing hard deletions <a name="harddelnote"></a>
 
 Starting v1.1, `ccloud-schema-exporter` provides an efficient way of syncing hard deletions.
 In previous versions, this was done through inefficient lookups.
@@ -161,7 +176,7 @@ NOTE: With regular `-syncDeletes`, the exporter will attempt to sync previously 
 This functionality also only applies to Confluent Cloud or Confluent Platform 6.1+; However, if it is not able to perform this sync 
 it will just keep syncing soft deletes it detects in the future.
 
-#### Non-Interactive Run
+### Non-Interactive Run <a name="noninteractive"></a>
 
 `ccloud-schema-exporter` is meant to be run in a non-interactive way. 
 However, it does include some checks to assure things go smoothly in the replication flow.
@@ -178,7 +193,7 @@ Not setting this may result in some versions not being able to be registered sin
 
 If you'd like more info on how to change the Schema Registry mode to enable non-interactive runs, see the [Schema Registry API Documentation](https://docs.confluent.io/current/schema-registry/develop/api.html#mode)
 
-#### Extendability: Custom Sources and Destinations
+### Extendability: Custom Sources and Destinations <a name="extendability"></a>
 
 `ccloud-schema-exporter` supports custom implementations of sources and destinations.
 If you'd like to leverage the already built back-end, all you have to do is an implementation of the `CustomSource` or `CustomDestination` interfaces.
@@ -261,12 +276,12 @@ The following options are respected for custom sources / destinations as well:
     	Setting this will sync soft deletes from the source cluster to the destination
 ````
 
-#### Monitoring
+### Monitoring <a name="monitoring"></a>
 
 When specified with `-withMetrics`, `ccloud-schema-exporter` will export health metrics on `:9020/metrics`.
 These metrics are in Prometheus format for ease of parse. A sample grafana dashboard is under the `samples` directory.
 
-#### Feature Requests / Issue Reporting
+## Feature Requests / Issue Reporting <a name="features"></a>
 
 This repo tracks feature requests and issues through Github Issues.
 If you'd like to see something fixed that was not caught by testing, or you'd like to see a new feature, please feel free
