@@ -6,14 +6,18 @@ package client
 //
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 func WriteToFS(srcClient *SchemaRegistryClient, definedPath string, workingDirectory string) {
@@ -24,11 +28,12 @@ func WriteToFS(srcClient *SchemaRegistryClient, definedPath string, workingDirec
 	srcSubjects := GetCurrentSubjectState(srcClient)
 	var aGroup sync.WaitGroup
 
-	log.Printf("Writing all schemas from %s to path %s", srcClient.SRUrl, definedPath)
+	log.Printf("Writing schemas from %s to path %s", srcClient.SRUrl, definedPath)
 	for srcSubject, srcVersions := range srcSubjects {
 		for _, v := range srcVersions {
 			aGroup.Add(1)
 			go writeSchemaLocally(srcClient, definedPath, srcSubject, v, &aGroup)
+			time.Sleep(time.Duration(1) * time.Millisecond)
 		}
 	}
 	aGroup.Wait()
@@ -50,7 +55,7 @@ func WriteFromFS(dstClient *SchemaRegistryClient, definedPath string, workingDir
 	check(err)
 
 	if CancelRun != true {
-		log.Println("Destination Schema Registry Fully Restored From Backup")
+		log.Println("Destination Schema Registry Restored From Backup")
 	} else {
 		log.Println("Destination Schema Registry Partially Restored From Backup")
 	}
@@ -64,9 +69,31 @@ func writeSchemaToSR(dstClient *SchemaRegistryClient, filepath string) {
 	id, version, subject, stype := parseFileName(filepath)
 	if checkSubjectIsAllowed(subject) {
 		rawSchema, err := ioutil.ReadFile(filepath)
+		fileString := string(rawSchema)
 		check(err)
-		log.Printf("Registering Schema with Subject: %s. Version: %v, and ID: %v", subject, version, id)
-		dstClient.RegisterSchemaBySubjectAndIDAndVersion(string(rawSchema), subject, id, version, stype)
+
+		referenceArray := []SchemaReference{}
+
+		if strings.Contains(fileString, ReferenceSeparator) {
+			referenceStart := strings.LastIndex(fileString, ReferenceSeparator) + len(ReferenceSeparator)
+			referenceString := strings.TrimSpace(strings.ReplaceAll(fileString[referenceStart:], "\n", ""))
+			referenceCollection := strings.Split(referenceString, "|")
+			for _, reference := range referenceCollection {
+				if len(reference) != 0 {
+					thisReference := SchemaReference{}
+					err := json.Unmarshal([]byte(reference), &thisReference)
+					check(err)
+					referenceArray = append(referenceArray, thisReference)
+				}
+			}
+			RegisterReferencesFromLocalFS(referenceArray, dstClient, path.Dir(filepath))
+			fileString = fileString[:strings.LastIndex(fileString, ReferenceSeparator)-1]
+		}
+
+		unescapedSubject, err := url.QueryUnescape(subject)
+		checkDontFail(err)
+		log.Printf("Registering Schema with Subject: %s. Version: %v, and ID: %v", unescapedSubject, version, id)
+		dstClient.RegisterSchemaBySubjectAndIDAndVersion(fileString, unescapedSubject, id, version, stype, referenceArray)
 	}
 }
 
@@ -102,7 +129,7 @@ func writeSchemaLocally(srcClient *SchemaRegistryClient, pathToWrite string, sub
 	log.Printf("Writing schema: %s with version: %d and ID: %d",
 		rawSchema.Subject, rawSchema.Version, rawSchema.Id)
 
-	filename := fmt.Sprintf("%s-%d-%d-%s", rawSchema.Subject, rawSchema.Version, rawSchema.Id, rawSchema.SType)
+	filename := fmt.Sprintf("%s-%d-%d-%s", url.QueryEscape(rawSchema.Subject), rawSchema.Version, rawSchema.Id, rawSchema.SType)
 	f, err := os.Create(filepath.Join(pathToWrite, filename))
 
 	check(err)
@@ -110,6 +137,23 @@ func writeSchemaLocally(srcClient *SchemaRegistryClient, pathToWrite string, sub
 
 	_, err = f.WriteString(rawSchema.Schema)
 	check(err)
+	if len(rawSchema.References) != 0 {
+		_, err = f.WriteString("\n")
+		check(err)
+		_, err = f.WriteString(ReferenceSeparator)
+		check(err)
+		_, err = f.WriteString("\n")
+		check(err)
+		for _, oneRef := range rawSchema.References {
+			jsonRepresentation, err := json.Marshal(oneRef)
+			check(err)
+			_, err = f.Write(jsonRepresentation)
+			check(err)
+			_, err = f.WriteString("|\n")
+			check(err)
+		}
+	}
+
 	_ = f.Sync()
 }
 

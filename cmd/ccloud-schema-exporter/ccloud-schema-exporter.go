@@ -127,7 +127,7 @@ func main() {
 		client.ThisRun == client.SYNC && client.SyncHardDeletes && !client.NoPrompt {
 
 		fmt.Println("It looks like you are trying to sync hard deletions between non-Confluent Cloud Schema Registries")
-		fmt.Println("Starting v1.1, ccloud-schema-exporter only supports hard deletion sync between Confluent Cloud Schema Registries")
+		fmt.Println("Starting v1.1, ccloud-schema-exporter only supports hard deletion sync between Confluent Cloud Schema Registries, or Confluent Platform 6.1+")
 		fmt.Println("------------------------------------------------------")
 		fmt.Println("Do you wish to continue? (Y/n)")
 
@@ -161,7 +161,7 @@ func main() {
 
 }
 
-func preflightWriteChecks (destClient *client.SchemaRegistryClient) {
+func preflightWriteChecks(destClient *client.SchemaRegistryClient) {
 
 	if !destClient.IsReachable() {
 		log.Println("Could not reach destination registry. Possible bad credentials?")

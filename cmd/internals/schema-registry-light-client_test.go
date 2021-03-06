@@ -41,7 +41,7 @@ func TestMainStack(t *testing.T) {
 	t.Run("TFilterListedSubjectsVersions", func(t *testing.T) { TFilterListedSubjectsVersions(t) })
 	t.Run("TPerformSoftDelete", func(t *testing.T) { TPerformSoftDelete(t) })
 	t.Run("TPerformHardDelete", func(t *testing.T) { TPerformHardDelete(t) })
-	t.Run("TGetSoftDeletedIds", func(t *testing.T) { TPerformHardDelete(t) })
+	t.Run("TGetSoftDeletedIds", func(t *testing.T) { TGetSoftDeletedIDs(t) })
 	t.Run("TDeleteAllSubjectsPermanently", func(t *testing.T) { TDeleteAllSubjectsPermanently(t) })
 	tearDown()
 }
@@ -59,6 +59,7 @@ func setup() {
 
 func tearDown() {
 	composeEnv.WithCommand([]string{"down", "-v"}).Invoke()
+	time.Sleep(time.Duration(10) * time.Second) // give services time to set up
 }
 
 func TIsReachable(t *testing.T) {
@@ -117,10 +118,10 @@ func TIsImportModeReady(t *testing.T) {
 }
 
 func TGetSubjectWithVersions(t *testing.T) {
-	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, testingSubject, 10001, 1, "AVRO")
+	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, testingSubject, 10001, 1, "AVRO", []SchemaReference{})
 
 	aChan := make(chan map[string][]int64)
-	go testClient.GetSubjectsWithVersions(aChan)
+	go testClient.GetSubjectsWithVersions(aChan, false)
 	result := <-aChan
 
 	assert.NotNil(t, result[testingSubject])
@@ -131,7 +132,7 @@ func TGetVersions(t *testing.T) {
 	var aGroup sync.WaitGroup
 
 	aChan := make(chan SubjectWithVersions)
-	go testClient.GetVersions(testingSubject, aChan, &aGroup)
+	go testClient.GetVersions(testingSubject, aChan, &aGroup, false)
 	aGroup.Add(1)
 	result := <-aChan
 	aGroup.Wait()
@@ -145,13 +146,13 @@ func TGetVersions(t *testing.T) {
 }
 
 func TGetSchema(t *testing.T) {
-	record := testClient.GetSchema(testingSubject, 1,false)
+	record := testClient.GetSchema(testingSubject, 1, false)
 	assert.Equal(t, mockSchema, record.Schema)
 }
 
 func TRegisterSchemaBySubjectAndIDAndVersion(t *testing.T) {
-	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, newSubject, 10001, 1, "AVRO")
-	record := testClient.GetSchema(newSubject, 1,false)
+	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, newSubject, 10001, 1, "AVRO", []SchemaReference{})
+	record := testClient.GetSchema(newSubject, 1, false)
 	assert.Equal(t, mockSchema, record.Schema)
 
 	testClient.PerformSoftDelete(newSubject, 1)
@@ -159,11 +160,11 @@ func TRegisterSchemaBySubjectAndIDAndVersion(t *testing.T) {
 }
 
 func TGetSoftDeletedIDs(t *testing.T) {
-	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, newSubject, 10001, 1, "AVRO")
+	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, newSubject, 10001, 1, "AVRO", []SchemaReference{})
 	testClient.PerformSoftDelete(newSubject, 1)
 	result := testClient.GetSoftDeletedIDs()
-	expected := map[int64]map[string]int64{
-		10001: {newSubject: 1}}
+	expected := map[int64]map[string][]int64{
+		10001: {newSubject: {1}}}
 
 	testClient.PerformHardDelete(newSubject, 1)
 	assert.Equal(t, expected, result)

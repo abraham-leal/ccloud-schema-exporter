@@ -33,6 +33,7 @@ var CancelRun bool
 var WithMetrics bool
 var AllowList StringArrayFlag
 var DisallowList StringArrayFlag
+var ReferenceSeparator = "=====References====="
 
 // Define RunMode Enum
 type RunMode int

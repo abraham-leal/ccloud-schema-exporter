@@ -9,10 +9,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 )
@@ -59,6 +59,7 @@ func (src *SchemaRegistryClient) IsReachable() bool {
 	if err != nil {
 		return false
 	}
+	defer res.Body.Close()
 
 	if res.StatusCode == 200 {
 		return true
@@ -68,28 +69,28 @@ func (src *SchemaRegistryClient) IsReachable() bool {
 }
 
 // Returns all non-deleted (soft or hard deletions) subjects with their versions in the form of a map.
-func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan<- map[string][]int64) {
-	endpoint := fmt.Sprintf("%s/subjects", src.SRUrl)
+func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan<- map[string][]int64, deleted bool) {
+	endpoint := ""
+	if deleted {
+		endpoint = fmt.Sprintf("%s/subjects?deleted=true", src.SRUrl)
+	} else {
+		endpoint = fmt.Sprintf("%s/subjects", src.SRUrl)
+	}
+
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 
 	res, err := httpClient.Do(req)
-	if err != nil {
-		log.Fatalln(err.Error())
-	}
+	check(err)
+	defer res.Body.Close()
 	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
 	response := []string{}
 
 	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.Printf(err.Error())
-	}
-	res.Body.Close()
+	checkDontFail(err)
 
 	err = json.Unmarshal(body, &response)
-	if err != nil {
-		log.Printf(err.Error())
-	}
+	checkDontFail(err)
 
 	// Convert back to slice for speed of iteration
 	filteredSubjects := []string{}
@@ -100,7 +101,6 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan<- map[string
 	response = filteredSubjects
 
 	// Start async fetching
-
 	var aGroup sync.WaitGroup
 	aChan := make(chan SubjectWithVersions)
 
@@ -112,7 +112,7 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan<- map[string
 			even more easily. During testing, it was found that 2ms is an ideal delay for best sync performance.
 		*/
 		time.Sleep(time.Duration(2) * time.Millisecond)
-		go src.GetVersions(s, aChan, &aGroup)
+		go src.GetVersions(s, aChan, &aGroup, deleted)
 	}
 	go func() {
 		aGroup.Wait()
@@ -130,8 +130,14 @@ func (src *SchemaRegistryClient) GetSubjectsWithVersions(chanY chan<- map[string
 }
 
 // Returns all non-deleted versions (soft or hard deleted) that exist for a given subject.
-func (src *SchemaRegistryClient) GetVersions(subject string, chanX chan<- SubjectWithVersions, wg *sync.WaitGroup) {
-	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl, subject)
+func (src *SchemaRegistryClient) GetVersions(subject string, chanX chan<- SubjectWithVersions, wg *sync.WaitGroup, deleted bool) {
+	endpoint := ""
+	if deleted {
+		endpoint = fmt.Sprintf("%s/subjects/%s/versions?deleted=true", src.SRUrl, url.QueryEscape(subject))
+	} else {
+		endpoint = fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl, url.QueryEscape(subject))
+	}
+
 	defer wg.Done()
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 
@@ -140,20 +146,16 @@ func (src *SchemaRegistryClient) GetVersions(subject string, chanX chan<- Subjec
 		log.Printf(err.Error())
 		return
 	}
+	defer res.Body.Close()
 	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
 	response := []int64{}
 
 	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.Printf(err.Error())
-	}
-	res.Body.Close()
+	checkDontFail(err)
 
 	err = json.Unmarshal(body, &response)
-	if err != nil {
-		log.Printf(err.Error())
-	}
+	checkDontFail(err)
 
 	pkgSbj := SubjectWithVersions{
 		Subject:  subject,
@@ -196,6 +198,8 @@ func (src *SchemaRegistryClient) SetGlobalCompatibility(comptToSet Compatibility
 		log.Printf(err.Error())
 		return false
 	}
+	defer res.Body.Close()
+
 	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
 	if res.StatusCode == 200 {
@@ -238,6 +242,8 @@ func (src *SchemaRegistryClient) SetMode(modeToSet Mode) bool {
 		log.Printf(err.Error())
 		return false
 	}
+	defer res.Body.Close()
+
 	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
 	if res.StatusCode == 200 {
@@ -250,9 +256,9 @@ func (src *SchemaRegistryClient) SetMode(modeToSet Mode) bool {
 
 // Returns a SchemaRecord for the given subject and version by querying the backing Schema Registry
 func (src *SchemaRegistryClient) GetSchema(subject string, version int64, deleted bool) SchemaRecord {
-	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d", src.SRUrl, subject, version)
+	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d", src.SRUrl, url.QueryEscape(subject), version)
 	if deleted {
-		endpoint = fmt.Sprintf("%s/subjects/%s/versions/%d?deleted=true", src.SRUrl, subject, version)
+		endpoint = fmt.Sprintf("%s/subjects/%s/versions/%d?deleted=true", src.SRUrl, url.QueryEscape(subject), version)
 	}
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 
@@ -262,6 +268,8 @@ func (src *SchemaRegistryClient) GetSchema(subject string, version int64, delete
 		log.Println("Could not retrieve schema!")
 		return SchemaRecord{}
 	}
+	defer res.Body.Close()
+
 	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
 	schemaResponse := new(SchemaRecord)
@@ -273,27 +281,25 @@ func (src *SchemaRegistryClient) GetSchema(subject string, version int64, delete
 	}
 
 	err = json.Unmarshal(body, &schemaResponse)
-	if err != nil {
-		log.Printf(err.Error())
-	}
+	checkDontFail(err)
 
-	return SchemaRecord{Subject: schemaResponse.Subject, Schema: schemaResponse.Schema, Version: schemaResponse.Version, Id: schemaResponse.Id, SType: schemaResponse.SType}.setTypeIfEmpty()
+	return SchemaRecord{Subject: schemaResponse.Subject, Schema: schemaResponse.Schema, Version: schemaResponse.Version, Id: schemaResponse.Id, SType: schemaResponse.SType, References: schemaResponse.References}.setTypeIfEmpty().setReferenceIfEmpty()
 }
 
 // Registers a schema
-func (src *SchemaRegistryClient) RegisterSchema(schema string, subject string, SType string) io.ReadCloser {
-	return src.RegisterSchemaBySubjectAndIDAndVersion(schema, subject, 0, 0, SType)
+func (src *SchemaRegistryClient) RegisterSchema(schema string, subject string, SType string, references []SchemaReference) []byte {
+	return src.RegisterSchemaBySubjectAndIDAndVersion(schema, subject, 0, 0, SType, references)
 }
 
 // Registers a schema with the given SchemaID and SchemaVersion
-func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion(schema string, subject string, id int64, version int64, SType string) io.ReadCloser {
-	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl, subject)
+func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion(schema string, subject string, id int64, version int64, SType string, references []SchemaReference) []byte {
+	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl, url.QueryEscape(subject))
 
 	schemaRequest := SchemaToRegister{}
 	if id == 0 && version == 0 {
-		schemaRequest = SchemaToRegister{Schema: schema, SType: SType}
+		schemaRequest = SchemaToRegister{Schema: schema, SType: SType, References: references}
 	} else {
-		schemaRequest = SchemaToRegister{Schema: schema, Id: id, Version: version, SType: SType}
+		schemaRequest = SchemaToRegister{Schema: schema, Id: id, Version: version, SType: SType, References: references}
 	}
 	schemaJSON, err := json.Marshal(schemaRequest)
 	if err != nil {
@@ -308,16 +314,21 @@ func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion(schema s
 		log.Println("Could not register schema!")
 		return nil
 	}
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	checkDontFail(err)
+
 	handleNotSuccess(res.Body, res.StatusCode, req.Method, endpoint)
 
-	if WithMetrics && res.StatusCode == 200{
+	if WithMetrics && res.StatusCode == 200 {
 		schemasRegistered.Inc()
 	}
 
-	return res.Body
+	return body
 }
 
-// Deletes all schemas in the backing Schema Registry
+// Deletes all schemas in the backing Schema Registry, including previously soft deleted subjects
 // This method does not respect AllowList or DisallowList
 func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently() {
 	destSubjects := make(map[string][]int64)
@@ -331,7 +342,7 @@ func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently() {
 
 	AllowList = nil
 	DisallowList = nil
-	go src.GetSubjectsWithVersions(destChan)
+	go src.GetSubjectsWithVersions(destChan, true)
 	destSubjects = <-destChan
 
 	AllowList = holderAllow
@@ -340,8 +351,10 @@ func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently() {
 	//Must perform soft delete before hard delete
 	for subject, versions := range destSubjects {
 		for _, version := range versions {
-			if src.PerformSoftDelete(subject, version) {
-				src.PerformHardDelete(subject, version)
+			if src.subjectExists(subject) {
+				if src.PerformSoftDelete(subject, version) {
+					src.PerformHardDelete(subject, version)
+				}
 			}
 		}
 	}
@@ -349,12 +362,74 @@ func (src *SchemaRegistryClient) DeleteAllSubjectsPermanently() {
 
 // Performs a Soft Delete on the given subject and version on the backing Schema Registry
 func (src *SchemaRegistryClient) PerformSoftDelete(subject string, version int64) bool {
-	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d", src.SRUrl, subject, version)
+	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d", src.SRUrl, url.QueryEscape(subject), version)
 	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 	res, err := httpClient.Do(req)
 	if err != nil {
 		log.Printf(err.Error())
 		return false
+	}
+
+	// We've confirmed this subject does not exist
+	if res.StatusCode == 404 {
+		return true
+	}
+
+	// Handle referenced subjects
+	if res.StatusCode == 422 {
+
+		regBody, err := ioutil.ReadAll(res.Body)
+		check(err)
+
+		errMsg := ErrorMessage{}
+
+		err = json.Unmarshal(regBody, &errMsg)
+		check(err)
+
+		if errMsg.ErrorCode == 42206 {
+			referencesEndpoint := fmt.Sprintf("%s/subjects/%s/versions/%d/referencedby", src.SRUrl, url.QueryEscape(subject), version)
+			findReferencingSchemas := GetNewRequest("GET", referencesEndpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
+
+			refRes, err := httpClient.Do(findReferencingSchemas)
+			checkDontFail(err)
+			defer refRes.Body.Close()
+			refBody, err := ioutil.ReadAll(refRes.Body)
+			checkDontFail(err)
+
+			idsReferencing := []int64{}
+
+			err = json.Unmarshal(refBody, &idsReferencing)
+			checkDontFail(err)
+
+			for _, thisId := range idsReferencing {
+				correlatedSubjectVersionsEndpoint := fmt.Sprintf("%s/schemas/ids/%d/versions", src.SRUrl, thisId)
+
+				findReferencingSubjectVersions := GetNewRequest("GET", correlatedSubjectVersionsEndpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
+
+				refSVRes, err := httpClient.Do(findReferencingSubjectVersions)
+				checkDontFail(err)
+				defer refSVRes.Body.Close()
+				refSVBody, err := ioutil.ReadAll(refSVRes.Body)
+				checkDontFail(err)
+
+				schemaVersionsReferencing := []SubjectVersion{}
+
+				err = json.Unmarshal(refSVBody, &schemaVersionsReferencing)
+				checkDontFail(err)
+
+				for _, subjectVersion := range schemaVersionsReferencing {
+					if src.PerformSoftDelete(subjectVersion.Subject, subjectVersion.Version) {
+						src.PerformHardDelete(subjectVersion.Subject, subjectVersion.Version)
+					}
+				}
+			}
+
+			// Attempt to delete original schema now that it isn't being referenced anymore.
+			return src.PerformSoftDelete(subject, version)
+
+		} else {
+			return false
+		}
 	}
 
 	return handleDeletesHTTPResponse(res.Body, res.StatusCode, req.Method, endpoint, "Soft", subject, version)
@@ -363,7 +438,7 @@ func (src *SchemaRegistryClient) PerformSoftDelete(subject string, version int64
 // Performs a Hard Delete on the given subject and version on the backing Schema Registry
 // NOTE: A Hard Delete should only be performed after a soft delete
 func (src *SchemaRegistryClient) PerformHardDelete(subject string, version int64) bool {
-	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d?permanent=true", src.SRUrl, subject, version)
+	endpoint := fmt.Sprintf("%s/subjects/%s/versions/%d?permanent=true", src.SRUrl, url.QueryEscape(subject), version)
 	req := GetNewRequest("DELETE", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 	res, err := httpClient.Do(req)
 	if err != nil {
@@ -394,22 +469,16 @@ func (src *SchemaRegistryClient) getSchemaList(deleted bool) map[int64]map[strin
 
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 	res, err := httpClient.Do(req)
-	if err != nil {
-		log.Fatalln(err.Error())
-	}
+	check(err)
+	defer res.Body.Close()
 
 	response := []SchemaExtraction{}
 
 	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		log.Printf(err.Error())
-	}
-	res.Body.Close()
+	checkDontFail(err)
 
 	err = json.Unmarshal(body, &response)
-	if err != nil {
-		log.Printf(err.Error())
-	}
+	checkDontFail(err)
 
 	responseMap := make(map[int64]map[string][]int64)
 
@@ -418,17 +487,31 @@ func (src *SchemaRegistryClient) getSchemaList(deleted bool) map[int64]map[strin
 		if haveSeenIDBefore {
 			_, haveSeenSubject := currentStateOfID[schema.Subject]
 			if haveSeenSubject {
-				responseMap[schema.Id][schema.Subject] = append(responseMap[schema.Id][schema.Subject],schema.Version)
+				responseMap[schema.Id][schema.Subject] = append(responseMap[schema.Id][schema.Subject], schema.Version)
 			} else {
 				tempMap := responseMap[schema.Id]
 				tempMap[schema.Subject] = []int64{schema.Version}
 				responseMap[schema.Id] = tempMap
 			}
 		} else {
-			responseMap[schema.Id] = map[string][]int64{schema.Subject : {schema.Version}}
+			responseMap[schema.Id] = map[string][]int64{schema.Subject: {schema.Version}}
 		}
 
 	}
 
 	return responseMap
+}
+
+func (src *SchemaRegistryClient) subjectExists(subject string) bool {
+	endpoint := fmt.Sprintf("%s/subjects/%s/versions?deleted=true", src.SRUrl, url.QueryEscape(subject))
+	sbjReq := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
+	response, err := httpClient.Do(sbjReq)
+	check(err)
+	defer response.Body.Close()
+
+	if response.StatusCode == 200 {
+		return true
+	} else {
+		return false
+	}
 }

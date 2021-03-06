@@ -63,7 +63,7 @@ func RunCustomDestinationBatch(srcClient *SchemaRegistryClient, customDest Custo
 	listenForInterruption()
 
 	srcChan := make(chan map[string][]int64)
-	go srcClient.GetSubjectsWithVersions(srcChan)
+	go srcClient.GetSubjectsWithVersions(srcChan, false)
 	srcSubjects := <-srcChan
 
 	log.Println("Registering all schemas from " + srcClient.SRUrl)

@@ -12,8 +12,11 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 )
 
@@ -36,6 +39,8 @@ func printVersion() {
 	fmt.Printf("ccloud-schema-exporter: %s\n", Version)
 }
 
+// Checks if the described path is a file
+// It will return false if the file does not exist or the given is a directory
 func fileExists(filename string) bool {
 	info, err := os.Stat(filename)
 	if os.IsNotExist(err) {
@@ -106,8 +111,9 @@ func deleteAllFromDestination(sr string, key string, secret string) {
 }
 
 // Handle the SR response to a delete command for a subject/version
-func handleDeletesHTTPResponse(body io.Reader, statusCode int, method string, endpoint string,
+func handleDeletesHTTPResponse(body io.ReadCloser, statusCode int, method string, endpoint string,
 	reqType string, subject string, version int64) bool {
+	defer body.Close()
 	if statusCode != 200 {
 		body, _ := ioutil.ReadAll(body)
 		errorMsg := fmt.Sprintf(statusError, statusCode, method, endpoint)
@@ -303,19 +309,19 @@ func GetIDDiff(m1 map[int64]map[string][]int64, m2 map[int64]map[string][]int64)
 				subjectRightVersions, subjectExistsRight := subjVersionsRightMap[subjectLeft]
 				if subjectExistsRight {
 					for _, singleVersionLeft := range versionsLeft { // Iterate through versions on left
-						if !isInSlice(singleVersionLeft, subjectRightVersions) {  // if not exists on right
+						if !isInSlice(singleVersionLeft, subjectRightVersions) { // if not exists on right
 							_, idInQueue := toDelete[idLeft]
 							if idInQueue {
 								_, subjectInQueue := toDelete[idLeft][subjectLeft]
 								if subjectInQueue {
-									toDelete[idLeft][subjectLeft] = append(toDelete[idLeft][subjectLeft],singleVersionLeft) // Add to holder for queueing for deletion
+									toDelete[idLeft][subjectLeft] = append(toDelete[idLeft][subjectLeft], singleVersionLeft) // Add to holder for queueing for deletion
 								} else {
 									tmpIDContents := toDelete[idLeft]
 									tmpIDContents[subjectLeft] = []int64{singleVersionLeft}
 									toDelete[idLeft] = tmpIDContents
 								}
 							} else {
-								tempMap := map[string][]int64{subjectLeft:{singleVersionLeft}}
+								tempMap := map[string][]int64{subjectLeft: {singleVersionLeft}}
 								toDelete[idLeft] = tempMap
 							}
 						}
@@ -327,7 +333,7 @@ func GetIDDiff(m1 map[int64]map[string][]int64, m2 map[int64]map[string][]int64)
 						tempMap[subjectLeft] = versionsLeft
 						toDelete[idLeft] = tempMap
 					} else {
-						toDelete[idLeft] = map[string][]int64{subjectLeft : versionsLeft}
+						toDelete[idLeft] = map[string][]int64{subjectLeft: versionsLeft}
 					}
 				}
 			}
@@ -350,7 +356,7 @@ func GetCurrentSubjectState(client *SchemaRegistryClient) map[string][]int64 {
 	subjects := make(map[string][]int64)
 	aChan := make(chan map[string][]int64)
 
-	go client.GetSubjectsWithVersions(aChan)
+	go client.GetSubjectsWithVersions(aChan, false)
 
 	subjects = <-aChan
 	return subjects
@@ -365,4 +371,48 @@ func listenForInterruption() {
 		log.Printf("Received %v signal, quitting non-started schema writes...", sig)
 		CancelRun = true
 	}()
+}
+
+func RegisterReferences(wrappingSchema SchemaRecord, srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient, deleted bool) {
+	if len(wrappingSchema.References) != 0 {
+		log.Printf("Registering references for subject %s and version %d", wrappingSchema.Subject, wrappingSchema.Version)
+		for _, schemaReference := range wrappingSchema.References {
+			schema := srcClient.GetSchema(schemaReference.Subject, schemaReference.Version, deleted)
+
+			schemaAlreadyRegistered := new(SchemaAlreadyRegisteredResponse)
+
+			responseBody := destClient.RegisterSchemaBySubjectAndIDAndVersion(schema.Schema,
+				schema.Subject,
+				schema.Id,
+				schema.Version,
+				schema.SType,
+				schema.References)
+
+			err := json.Unmarshal(responseBody, &schemaAlreadyRegistered)
+
+			if err == nil {
+				log.Printf("Reference schema subject %s was already written with version: %d and ID: %d", schema.Subject, schema.Version, schema.Id)
+			} else {
+				log.Printf("Registering referenced schema: %s with version: %d and ID: %d and Type: %s",
+					schema.Subject, schema.Version, schema.Id, schema.SType)
+			}
+		}
+	}
+}
+
+func RegisterReferencesFromLocalFS(referencesToRegister []SchemaReference, dstClient *SchemaRegistryClient, pathToLookForReferences string) {
+
+	err := filepath.Walk(pathToLookForReferences,
+		func(path string, info os.FileInfo, err error) error {
+			check(err)
+			for _, oneRef := range referencesToRegister {
+				if !info.IsDir() && strings.Contains(info.Name(), fmt.Sprintf("%s-%d", url.QueryEscape(oneRef.Subject), oneRef.Version)) {
+					log.Println(fmt.Sprintf("Writing referenced schema with Subject: %s and Version: %d. Filepath: %s", oneRef.Subject, oneRef.Version, path))
+					writeSchemaToSR(dstClient, path)
+				}
+			}
+
+			return nil
+		})
+	check(err)
 }
