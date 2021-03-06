@@ -59,6 +59,7 @@ func setup() {
 
 func tearDown() {
 	composeEnv.WithCommand([]string{"down", "-v"}).Invoke()
+	time.Sleep(time.Duration(10) * time.Second) // give services time to set up
 }
 
 func TIsReachable(t *testing.T) {
