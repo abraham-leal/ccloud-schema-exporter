@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -110,8 +111,9 @@ func deleteAllFromDestination(sr string, key string, secret string) {
 }
 
 // Handle the SR response to a delete command for a subject/version
-func handleDeletesHTTPResponse(body io.Reader, statusCode int, method string, endpoint string,
+func handleDeletesHTTPResponse(body io.ReadCloser, statusCode int, method string, endpoint string,
 	reqType string, subject string, version int64) bool {
+	defer body.Close()
 	if statusCode != 200 {
 		body, _ := ioutil.ReadAll(body)
 		errorMsg := fmt.Sprintf(statusError, statusCode, method, endpoint)
@@ -354,7 +356,7 @@ func GetCurrentSubjectState(client *SchemaRegistryClient) map[string][]int64 {
 	subjects := make(map[string][]int64)
 	aChan := make(chan map[string][]int64)
 
-	go client.GetSubjectsWithVersions(aChan)
+	go client.GetSubjectsWithVersions(aChan, false)
 
 	subjects = <-aChan
 	return subjects
@@ -404,7 +406,7 @@ func RegisterReferencesFromLocalFS(referencesToRegister []SchemaReference, dstCl
 		func(path string, info os.FileInfo, err error) error {
 			check(err)
 			for _, oneRef := range referencesToRegister {
-				if !info.IsDir() && strings.Contains(info.Name(), fmt.Sprintf("%s-%d", oneRef.Subject, oneRef.Version)) {
+				if !info.IsDir() && strings.Contains(info.Name(), fmt.Sprintf("%s-%d", url.QueryEscape(oneRef.Subject), oneRef.Version)) {
 					log.Println(fmt.Sprintf("Writing referenced schema with Subject: %s and Version: %d. Filepath: %s", oneRef.Subject, oneRef.Version, path))
 					writeSchemaToSR(dstClient, path)
 				}

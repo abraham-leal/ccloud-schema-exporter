@@ -65,8 +65,8 @@ func TestExportMode(t *testing.T) {
 	srcChan := make(chan map[string][]int64)
 	dstChan := make(chan map[string][]int64)
 
-	go testClientSrc.GetSubjectsWithVersions(srcChan)
-	go testClientDst.GetSubjectsWithVersions(dstChan)
+	go testClientSrc.GetSubjectsWithVersions(srcChan, false)
+	go testClientDst.GetSubjectsWithVersions(dstChan, false)
 
 	srcSubjects := <-srcChan
 	dstSubjects := <-dstChan
@@ -82,7 +82,7 @@ func TestExportMode(t *testing.T) {
 	client.DisallowList = nil
 
 	client.BatchExport(testClientSrc, testClientDst)
-	go testClientDst.GetSubjectsWithVersions(dstChan)
+	go testClientDst.GetSubjectsWithVersions(dstChan, false)
 	dstSubjects = <-dstChan
 
 	_, contains := dstSubjects[testingSubjectKey]
@@ -96,7 +96,7 @@ func TestExportMode(t *testing.T) {
 	//Get length of subjects without filters
 	client.AllowList = nil
 	client.DisallowList = nil
-	go testClientDst.GetSubjectsWithVersions(dstChan)
+	go testClientSrc.GetSubjectsWithVersions(dstChan, false)
 	dstSubjectsAll := <-dstChan
 
 	client.AllowList = nil
@@ -105,10 +105,12 @@ func TestExportMode(t *testing.T) {
 	}
 
 	client.BatchExport(testClientSrc, testClientDst)
-	go testClientDst.GetSubjectsWithVersions(dstChan)
+	go testClientDst.GetSubjectsWithVersions(dstChan, false)
 	dstSubjects = <-dstChan
 
 	_, contains = dstSubjects[testingSubjectKey]
+	log.Println(len(dstSubjectsAll))
+	log.Println(len(client.DisallowList))
 	assert.Equal(t, len(dstSubjectsAll)-len(client.DisallowList), len(dstSubjects))
 	assert.True(t, contains)
 }
@@ -126,6 +128,7 @@ func TestLocalMode(t *testing.T) {
 	testLocalCopy(t, registrationCount)
 
 	log.Println("Test Local Mode With Allow Lists!")
+	cleanup()
 
 	client.DisallowList = nil
 	client.AllowList = map[string]bool{
@@ -133,13 +136,14 @@ func TestLocalMode(t *testing.T) {
 	}
 
 	dstChan := make(chan map[string][]int64)
-	go testClientDst.GetSubjectsWithVersions(dstChan)
+	go testClientSrc.GetSubjectsWithVersions(dstChan, false)
 	dstSubjects := <-dstChan
+	log.Println(dstSubjects)
 
 	filteredSubjectCount := 0
 	for _, versions := range dstSubjects {
 		for _, _ = range versions {
-			filteredSubjectCount = filteredSubjectCount + 1
+			filteredSubjectCount++
 		}
 	}
 
@@ -147,19 +151,21 @@ func TestLocalMode(t *testing.T) {
 	testLocalCopy(t, filteredSubjectCount)
 
 	log.Println("Test Local Mode With Disallow Lists!")
+	cleanup()
 
 	client.AllowList = nil
 	client.DisallowList = map[string]bool{
 		testingSubjectValue: true,
 	}
 
-	go testClientDst.GetSubjectsWithVersions(dstChan)
+	go testClientSrc.GetSubjectsWithVersions(dstChan, false)
 	dstSubjects = <-dstChan
+	log.Println(dstSubjects)
 
 	filteredSubjectCount = 0
 	for _, versions := range dstSubjects {
 		for _, _ = range versions {
-			filteredSubjectCount = filteredSubjectCount + 1
+			filteredSubjectCount++
 		}
 	}
 
@@ -345,8 +351,8 @@ func testSoftDelete(t *testing.T, lenOfDestSubjects int) {
 
 	// Assert schemas in dest deep equal schemas in src
 
-	go testClientSrc.GetSubjectsWithVersions(srcChan)
-	go testClientDst.GetSubjectsWithVersions(destChan)
+	go testClientSrc.GetSubjectsWithVersions(srcChan, false)
+	go testClientDst.GetSubjectsWithVersions(destChan, false)
 
 	srcSubjects = <-srcChan
 	destSubjects = <-destChan
@@ -368,8 +374,8 @@ func testInitialSync(t *testing.T, lenOfDestSubjects int) {
 	srcChan := make(chan map[string][]int64)
 	destChan := make(chan map[string][]int64)
 
-	go testClientSrc.GetSubjectsWithVersions(srcChan)
-	go testClientDst.GetSubjectsWithVersions(destChan)
+	go testClientSrc.GetSubjectsWithVersions(srcChan, false)
+	go testClientDst.GetSubjectsWithVersions(destChan, false)
 
 	srcSubjects = <-srcChan
 	destSubjects = <-destChan
@@ -404,8 +410,8 @@ func testRegistrationSync(t *testing.T, lenOfDestSubjects int) {
 
 	// Assert schemas in dest deep equal schemas in src
 
-	go testClientSrc.GetSubjectsWithVersions(srcChan)
-	go testClientDst.GetSubjectsWithVersions(destChan)
+	go testClientSrc.GetSubjectsWithVersions(srcChan, false)
+	go testClientDst.GetSubjectsWithVersions(destChan, false)
 
 	srcSubjects = <-srcChan
 	destSubjects = <-destChan

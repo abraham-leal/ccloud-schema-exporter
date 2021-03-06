@@ -10,12 +10,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 func WriteToFS(srcClient *SchemaRegistryClient, definedPath string, workingDirectory string) {
@@ -31,6 +33,7 @@ func WriteToFS(srcClient *SchemaRegistryClient, definedPath string, workingDirec
 		for _, v := range srcVersions {
 			aGroup.Add(1)
 			go writeSchemaLocally(srcClient, definedPath, srcSubject, v, &aGroup)
+			time.Sleep(time.Duration(1) * time.Millisecond)
 		}
 	}
 	aGroup.Wait()
@@ -84,10 +87,13 @@ func writeSchemaToSR(dstClient *SchemaRegistryClient, filepath string) {
 				}
 			}
 			RegisterReferencesFromLocalFS(referenceArray, dstClient, path.Dir(filepath))
+			fileString = fileString[:strings.LastIndex(fileString, ReferenceSeparator)-1]
 		}
 
-		log.Printf("Registering Schema with Subject: %s. Version: %v, and ID: %v", subject, version, id)
-		dstClient.RegisterSchemaBySubjectAndIDAndVersion(string(rawSchema), subject, id, version, stype, referenceArray)
+		unescapedSubject, err := url.QueryUnescape(subject)
+		checkDontFail(err)
+		log.Printf("Registering Schema with Subject: %s. Version: %v, and ID: %v", unescapedSubject, version, id)
+		dstClient.RegisterSchemaBySubjectAndIDAndVersion(fileString, unescapedSubject, id, version, stype, referenceArray)
 	}
 }
 
@@ -123,7 +129,7 @@ func writeSchemaLocally(srcClient *SchemaRegistryClient, pathToWrite string, sub
 	log.Printf("Writing schema: %s with version: %d and ID: %d",
 		rawSchema.Subject, rawSchema.Version, rawSchema.Id)
 
-	filename := fmt.Sprintf("%s-%d-%d-%s", rawSchema.Subject, rawSchema.Version, rawSchema.Id, rawSchema.SType)
+	filename := fmt.Sprintf("%s-%d-%d-%s", url.QueryEscape(rawSchema.Subject), rawSchema.Version, rawSchema.Id, rawSchema.SType)
 	f, err := os.Create(filepath.Join(pathToWrite, filename))
 
 	check(err)

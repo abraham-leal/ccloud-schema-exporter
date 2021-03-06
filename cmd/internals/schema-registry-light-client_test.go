@@ -120,7 +120,7 @@ func TGetSubjectWithVersions(t *testing.T) {
 	testClient.RegisterSchemaBySubjectAndIDAndVersion(mockSchema, testingSubject, 10001, 1, "AVRO", []SchemaReference{})
 
 	aChan := make(chan map[string][]int64)
-	go testClient.GetSubjectsWithVersions(aChan)
+	go testClient.GetSubjectsWithVersions(aChan, false)
 	result := <-aChan
 
 	assert.NotNil(t, result[testingSubject])
@@ -131,7 +131,7 @@ func TGetVersions(t *testing.T) {
 	var aGroup sync.WaitGroup
 
 	aChan := make(chan SubjectWithVersions)
-	go testClient.GetVersions(testingSubject, aChan, &aGroup)
+	go testClient.GetVersions(testingSubject, aChan, &aGroup, false)
 	aGroup.Add(1)
 	result := <-aChan
 	aGroup.Wait()
