@@ -1,6 +1,4 @@
 = Schema Exporter for Confluent Cloud
-:toc: preamble
-:toc-title: The Details...
 
 image:https://travis-ci.com/abraham-leal/ccloud-schema-exporter.svg?branch=master["Build Status", link="https://travis-ci.com/abraham-leal/ccloud-schema-exporter"]
 image:https://sonarcloud.io/api/project_badges/measure?project=abraham-leal_ccloud-schema-exporter&metric=alert_status["Quality Gate", link="https://sonarcloud.io/dashboard?id=abraham-leal_ccloud-schema-exporter"]
