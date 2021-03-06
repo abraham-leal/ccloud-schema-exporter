@@ -16,7 +16,6 @@ script:
   - docker-compose up -d
   - go test
   - cd ../internals
-  - docker-compose -f ../integrationTests/docker-compose-internal.yml --env-file ../integrationTests/.env up -d
   - go test
 
 addons:
