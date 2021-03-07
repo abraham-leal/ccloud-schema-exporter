@@ -30,8 +30,8 @@ type CustomDestination interface {
 	// The SchemaRecord struct provides all details needed for registration.
 	RegisterSchema(record SchemaRecord) error
 	// An implementation should handle the deletion of a schema in the destination.
-	// The SchemaRecord struct provides all details needed for deletion.
-	DeleteSchema(record SchemaRecord) error
+	// The Destination must be able to resolve what to delete from the subject and version provided.
+	DeleteSchema(subject string, version int64) error
 	// An implementation should be able to send exactly one map describing the state of the destination
 	// This map should be minimal. Describing only the Subject and Versions that already exist.
 	GetDestinationState() (map[string][]int64, error)

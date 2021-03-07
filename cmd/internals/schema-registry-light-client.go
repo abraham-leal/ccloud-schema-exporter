@@ -502,6 +502,7 @@ func (src *SchemaRegistryClient) getSchemaList(deleted bool) map[int64]map[strin
 	return responseMap
 }
 
+// Checks if the subject is in the backing schema registry, regardless of it is soft deleted or not.
 func (src *SchemaRegistryClient) subjectExists(subject string) bool {
 	endpoint := fmt.Sprintf("%s/subjects/%s/versions?deleted=true", src.SRUrl, url.QueryEscape(subject))
 	sbjReq := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)

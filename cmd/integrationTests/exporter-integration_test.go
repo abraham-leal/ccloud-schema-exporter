@@ -31,6 +31,12 @@ var registrationCount = 0
 var registeredSubjectCount = 0
 var seenSubjects map[string]string
 
+/*
+	General Integration Testing Framework for the ccloud-schema-exporter.
+	To register more schemas for testing, add to setupSource() and make sure to use registerAtSource to register the
+	schema in the source Schema Registry.
+ */
+
 func TestMain(m *testing.M) {
 	setup()
 	code := m.Run()
@@ -268,7 +274,9 @@ func setupSource() {
 
 	schema6 := "{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
 
-	schemaToReference := "{\"type\":\"record\",\"name\":\"reference\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"}]}"
+	schemaToReferenceFinal := "{\"type\":\"record\",\"name\":\"referenceWithDepth\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"}]}"
+
+	schemaToReference := "{\"type\":\"record\",\"name\":\"reference\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"com.reference.referenceWithDepth\"}]}"
 
 	schemaReferencing := "{\"type\":\"record\",\"name\":\"sampleRecordreferencing\",\"namespace\":\"com.mycorp.somethinghere\",\"fields\":[{\"name\":\"reference\",\"type\":\"com.reference.reference\"}]}"
 	schemas := []string{schema, schema2, schema3, schema4, schema5, schema6}
@@ -298,8 +306,15 @@ func setupSource() {
 		}
 	}
 
+	// One More depth level
+	registerAtSource(schemaToReferenceFinal, "referenceWithDepth", 12344, 1, "AVRO", nil)
+	referenceStructDepth := client.SchemaReference{
+		Name:    "com.reference.referenceWithDepth",
+		Subject: "referenceWithDepth",
+		Version: 1,
+	}
 	// Register referencing test
-	registerAtSource(schemaToReference, "reference", 12345, 1, "AVRO", nil)
+	registerAtSource(schemaToReference, "reference", 12345, 1, "AVRO", []client.SchemaReference{referenceStructDepth})
 	referenceStruct := client.SchemaReference{
 		Name:    "com.reference.reference",
 		Subject: "reference",

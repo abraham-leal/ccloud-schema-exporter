@@ -184,3 +184,21 @@ func CheckPath(definedPath string, workingDirectory string) string {
 		return definedPath
 	}
 }
+
+// Registers the given references by looking them up in the path given.
+func RegisterReferencesFromLocalFS(referencesToRegister []SchemaReference, dstClient *SchemaRegistryClient, pathToLookForReferences string) {
+
+	err := filepath.Walk(pathToLookForReferences,
+		func(path string, info os.FileInfo, err error) error {
+			check(err)
+			for _, oneRef := range referencesToRegister {
+				if !info.IsDir() && strings.Contains(info.Name(), fmt.Sprintf("%s-%d", url.QueryEscape(oneRef.Subject), oneRef.Version)) {
+					log.Println(fmt.Sprintf("Writing referenced schema with Subject: %s and Version: %d. Filepath: %s", oneRef.Subject, oneRef.Version, path))
+					writeSchemaToSR(dstClient, path)
+				}
+			}
+
+			return nil
+		})
+	check(err)
+}
