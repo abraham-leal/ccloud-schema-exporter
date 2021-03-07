@@ -161,6 +161,9 @@ func (cd *SampleCustomDestination) DeleteSchema(subject string, version int64) e
 			}
 		}
 		cd.inMemState[subject] = newSlice
+		if len(cd.inMemState[subject]) == 0 {
+			delete(cd.inMemState, subject)
+		}
 	}
 	return nil
 }

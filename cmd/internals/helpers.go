@@ -12,11 +12,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"strings"
 	"syscall"
 )
 
@@ -373,95 +370,3 @@ func listenForInterruption() {
 	}()
 }
 
-// Registers the schema references given in the SchemaRecord, recursively
-func RegisterReferences(wrappingSchema SchemaRecord, srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient, deleted bool) {
-	if len(wrappingSchema.References) != 0 {
-		log.Printf("Registering references for subject %s and version %d", wrappingSchema.Subject, wrappingSchema.Version)
-		for _, schemaReference := range wrappingSchema.References {
-			schema := srcClient.GetSchema(schemaReference.Subject, schemaReference.Version, deleted)
-
-			if len(schema.References) != 0 {
-				RegisterReferences(schema, srcClient, destClient, deleted)
-			}
-
-			schemaAlreadyRegistered := new(SchemaAlreadyRegisteredResponse)
-
-			responseBody := destClient.RegisterSchemaBySubjectAndIDAndVersion(schema.Schema,
-				schema.Subject,
-				schema.Id,
-				schema.Version,
-				schema.SType,
-				schema.References)
-
-			err := json.Unmarshal(responseBody, &schemaAlreadyRegistered)
-
-			if err == nil {
-				log.Printf("Reference schema subject %s was already written with version: %d and ID: %d", schema.Subject, schema.Version, schema.Id)
-			} else {
-				log.Printf("Registering referenced schema: %s with version: %d and ID: %d and Type: %s",
-					schema.Subject, schema.Version, schema.Id, schema.SType)
-			}
-		}
-	}
-}
-
-// Registers the schema references given in the SchemaRecord, recursively, for a custom source
-func RegisterReferencesWithCustomSource(wrappingSchema SchemaRecord, customSrc CustomSource, destClient *SchemaRegistryClient) {
-	if len(wrappingSchema.References) != 0 {
-		log.Printf("Registering references for subject %s and version %d", wrappingSchema.Subject, wrappingSchema.Version)
-		for _, schemaReference := range wrappingSchema.References {
-			schemaId, schemaType, schemaString, schemaReferencesWithin, err:= customSrc.GetSchema(schemaReference.Subject, schemaReference.Version)
-			if err != nil {
-				log.Println("Could not retrieve schema from custom source")
-			}
-			if len(schemaReferencesWithin) != 0 {
-				thisReferenceSchemaRecord := SchemaRecord{
-					Subject:    schemaReference.Subject,
-					Schema:     schemaString,
-					SType:      schemaType,
-					Version:    schemaReference.Version,
-					Id:         schemaId,
-					References: schemaReferencesWithin,
-				}
-				RegisterReferencesWithCustomSource(thisReferenceSchemaRecord, customSrc, destClient)
-			}
-
-			schemaAlreadyRegistered := new(SchemaAlreadyRegisteredResponse)
-
-			responseBody := destClient.RegisterSchemaBySubjectAndIDAndVersion(schemaString,
-				schemaReference.Subject,
-				schemaId,
-				schemaReference.Version,
-				schemaType,
-				schemaReferencesWithin)
-
-			err = json.Unmarshal(responseBody, &schemaAlreadyRegistered)
-
-			if err == nil {
-				log.Printf("Reference schema subject %s was already written with version: %d and ID: %d",
-					schemaReference.Subject, schemaReference.Version, schemaId)
-			} else {
-				log.Printf("Registering referenced schema: %s with version: %d and ID: %d and Type: %s",
-					schemaReference.Subject, schemaReference.Version, schemaId, schemaType)
-			}
-		}
-	}
-}
-
-// Registers the given references by looking them up in the path given.
-func RegisterReferencesFromLocalFS(referencesToRegister []SchemaReference, dstClient *SchemaRegistryClient, pathToLookForReferences string) {
-
-	err := filepath.Walk(pathToLookForReferences,
-		func(path string, info os.FileInfo, err error) error {
-			check(err)
-			for _, oneRef := range referencesToRegister {
-				if !info.IsDir() && strings.Contains(info.Name(), fmt.Sprintf("%s-%d", url.QueryEscape(oneRef.Subject), oneRef.Version)) {
-					log.Println(fmt.Sprintf("Writing referenced schema with Subject: %s and Version: %d. Filepath: %s", oneRef.Subject, oneRef.Version, path))
-					writeSchemaToSR(dstClient, path)
-				}
-			}
-
-			return nil
-		})
-	check(err)
-}

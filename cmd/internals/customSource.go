@@ -164,6 +164,50 @@ func RunCustomSourceBatch(dstClient *SchemaRegistryClient, customSrc CustomSourc
 	}
 }
 
+
+// Registers the schema references given in the SchemaRecord, recursively, for a custom source
+func RegisterReferencesWithCustomSource(wrappingSchema SchemaRecord, customSrc CustomSource, destClient *SchemaRegistryClient) {
+	if len(wrappingSchema.References) != 0 {
+		log.Printf("Registering references for subject %s and version %d", wrappingSchema.Subject, wrappingSchema.Version)
+		for _, schemaReference := range wrappingSchema.References {
+			schemaId, schemaType, schemaString, schemaReferencesWithin, err:= customSrc.GetSchema(schemaReference.Subject, schemaReference.Version)
+			if err != nil {
+				log.Println("Could not retrieve schema from custom source")
+			}
+			if len(schemaReferencesWithin) != 0 {
+				thisReferenceSchemaRecord := SchemaRecord{
+					Subject:    schemaReference.Subject,
+					Schema:     schemaString,
+					SType:      schemaType,
+					Version:    schemaReference.Version,
+					Id:         schemaId,
+					References: schemaReferencesWithin,
+				}
+				RegisterReferencesWithCustomSource(thisReferenceSchemaRecord, customSrc, destClient)
+			}
+
+			schemaAlreadyRegistered := new(SchemaAlreadyRegisteredResponse)
+
+			responseBody := destClient.RegisterSchemaBySubjectAndIDAndVersion(schemaString,
+				schemaReference.Subject,
+				schemaId,
+				schemaReference.Version,
+				schemaType,
+				schemaReferencesWithin)
+
+			err = json.Unmarshal(responseBody, &schemaAlreadyRegistered)
+
+			if err == nil {
+				log.Printf("Reference schema subject %s was already written with version: %d and ID: %d",
+					schemaReference.Subject, schemaReference.Version, schemaId)
+			} else {
+				log.Printf("Registering referenced schema: %s with version: %d and ID: %d and Type: %s",
+					schemaReference.Subject, schemaReference.Version, schemaId, schemaType)
+			}
+		}
+	}
+}
+
 /*
 This is an example of a custom source.
 This example uses Apicurio Registry as the source.

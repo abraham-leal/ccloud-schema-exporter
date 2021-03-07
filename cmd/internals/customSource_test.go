@@ -111,7 +111,7 @@ func TCustomSourceSync(t *testing.T) {
 	assert.Equal(t,len(myTestCustomSource.inMemSchemas), len(testClient.getSchemaList(false)))
 
 	CancelRun = true
-	time.Sleep(time.Duration(2) * time.Second) // Give time for killing goroutine
+	time.Sleep(time.Duration(3) * time.Second) // Give time for killing goroutine
 
 	testClient.DeleteAllSubjectsPermanently()
 }
