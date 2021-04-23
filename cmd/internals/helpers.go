@@ -419,3 +419,22 @@ func RegisterReferencesFromLocalFS(referencesToRegister []SchemaReference, dstCl
 		})
 	check(err)
 }
+
+func GetAvroSchemaDescriptor (fullReferenceName string) SchemaDescriptor {
+
+	lastDot := strings.LastIndex(fullReferenceName,".")
+
+	if lastDot == -1 {
+		return SchemaDescriptor{}
+	}
+
+	namespace := fullReferenceName[:lastDot]
+	name := fullReferenceName[lastDot:]
+
+	thisDescriptor := SchemaDescriptor{
+		namespace: namespace,
+		name:      name,
+	}
+
+	return thisDescriptor
+}
