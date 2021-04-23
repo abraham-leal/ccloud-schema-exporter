@@ -1,8 +1,8 @@
-# Schema Exporter for Confluent Cloud
+= Schema Exporter for Confluent Schema Registry
 
 [![Build](https://travis-ci.com/abraham-leal/ccloud-schema-exporter.svg?branch=master)]() [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=abraham-leal_ccloud-schema-exporter&metric=alert_status)](https://sonarcloud.io/dashboard?id=abraham-leal_ccloud-schema-exporter)
 
-A tool to export schemas from a Confluent Cloud Schema Registry to another.
+A tool to export schemas from a Confluent Schema Registry to another.
 This app supports four modes: `batchExport`, `sync`, `getLocalCopy`, and `fromLocalCopy`.
 
 - `batchExport` will do a one time migration between schema registries, then it will reset the destination registry to `READWRTIE` mode.
@@ -10,8 +10,10 @@ This app supports four modes: `batchExport`, `sync`, `getLocalCopy`, and `fromLo
 - `getLocalCopy` will fetch and write local copies of Schema Registry's Schemas.
 - `fromLocalCopy` will write schemas fetched by `getLocalCopy` to the destination Schema Registry.
 
-If you are looking to migrate schemas between On-Premise and Confluent Cloud, check out 
-[Confluent Replicator](https://docs.confluent.io/current/connect/kafka-connect-replicator/index.html).
+This tool supports migrating from self-hosted Schema Registries as well, but if you are looking to migrate schemas
+between On-Premise and Confluent Cloud, check out
+https://docs.confluent.io/current/connect/kafka-connect-replicator/index.html[Confluent Replicator].
+(Dummy values can be placed for non-secured Schema Registries)
 
 The exporter expects the following variables to be set in the environment to make the necessary calls:
 (In the case of `-getLocalCopy` and `-customDestination` it does not need `DST_*` variables; In the case of `-fromLocalCopy` and `-customSource` it does not need `SRC_*` variables)
@@ -169,9 +171,11 @@ You can disable these checks by setting the configuration `-noPrompt`.
 By default, the docker image has this in its entry point.
 
 There are three checks made:
+
 - The destination schema registry is in `IMPORT` mode. This is a requirement, otherwise the replication won't work.
 - When syncing hard deletions, both clusters are Confluent Cloud Schema Registries. This is a requirement.
 - The destination schema registry is in `NONE` global compatibility mode.
+
 This is not a requirement, but suggested since per-subject compatibility rules cannot be determined per version.
 Not setting this may result in some versions not being able to be registered since they do not adhere to the global compatibility mode.
 (The default compatibility in Confluent Cloud is `BACKWARD`).
@@ -264,7 +268,7 @@ The following options are respected for custom sources / destinations as well:
 #### Monitoring
 
 When specified with `-withMetrics`, `ccloud-schema-exporter` will export health metrics on `:9020/metrics`.
-These metrics are in Prometheus format for ease of parse. A sample grafana dashboard is under the `samples` directory.
+These metrics are in Prometheus format for ease of parse. A sample Grafana dashboard is under the `samples` directory.
 
 #### Feature Requests / Issue Reporting
 
