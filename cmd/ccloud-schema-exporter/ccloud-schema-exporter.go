@@ -51,7 +51,7 @@ func main() {
 
 		destClient := client.NewSchemaRegistryClient(client.DestSRUrl, client.DestSRKey, client.DestSRSecret, "dst")
 		if !client.NoPrompt {
-			preflightWriteChecks(destClient)
+			preflightWriteChecks(destClient, false)
 		}
 
 		if client.ThisRun == client.BATCH {
@@ -74,10 +74,30 @@ func main() {
 
 		destClient := client.NewSchemaRegistryClient(client.DestSRUrl, client.DestSRKey, client.DestSRSecret, "dst")
 		if !client.NoPrompt {
-			preflightWriteChecks(destClient)
+			preflightWriteChecks(destClient, false)
 		}
 
 		client.WriteFromFS(destClient, client.PathToWrite, workingDir)
+
+		log.Println("-----------------------------------------------")
+		log.Println("All Done! Thanks for using ccloud-schema-exporter!")
+
+		os.Exit(0)
+	}
+
+	if client.ThisRun == client.SCHEMALOAD {
+		workingDir, err := os.Getwd()
+		if err != nil {
+			log.Fatalln("Could not get execution path. Possibly a permissions issue.")
+		}
+
+		destClient := client.NewSchemaRegistryClient(client.DestSRUrl, client.DestSRKey, client.DestSRSecret, "dst")
+		if !client.NoPrompt {
+			preflightWriteChecks(destClient, true)
+		}
+
+		schemaLoader := client.NewSchemaLoader(client.SchemaLoadType, destClient, client.PathToWrite , workingDir)
+		schemaLoader.Run()
 
 		log.Println("-----------------------------------------------")
 		log.Println("All Done! Thanks for using ccloud-schema-exporter!")
@@ -119,7 +139,7 @@ func main() {
 
 	destClient := client.NewSchemaRegistryClient(client.DestSRUrl, client.DestSRKey, client.DestSRSecret, "dst")
 	if !client.NoPrompt {
-		preflightWriteChecks(destClient)
+		preflightWriteChecks(destClient, false)
 	}
 
 	if (!strings.HasSuffix(srcClient.SRUrl, "confluent.cloud") ||
@@ -161,42 +181,44 @@ func main() {
 
 }
 
-func preflightWriteChecks(destClient *client.SchemaRegistryClient) {
+func preflightWriteChecks(destClient *client.SchemaRegistryClient, noImport bool) {
 
 	if !destClient.IsReachable() {
 		log.Println("Could not reach destination registry. Possible bad credentials?")
 		os.Exit(0)
 	}
 
-	destSubjects := client.GetCurrentSubjectState(destClient)
-	if len(destSubjects) != 0 && client.ThisRun != client.SYNC {
-		log.Println("You have existing subjects registered in the destination registry, exporter cannot write schemas when " +
-			"previous schemas exist in batch mode.")
-		os.Exit(0)
-	}
-
-	if !destClient.IsImportModeReady() {
-
-		fmt.Println("Destination Schema Registry is not set to IMPORT mode!")
-		fmt.Println("------------------------------------------------------")
-		fmt.Println("Set to import mode? (Y/n)")
-
-		var text string
-
-		_, err := fmt.Scanln(&text)
-		if err != nil {
-			log.Fatal(err)
+	if !noImport {
+		destSubjects := client.GetCurrentSubjectState(destClient)
+		if len(destSubjects) != 0 && client.ThisRun != client.SYNC {
+			log.Println("You have existing subjects registered in the destination registry, exporter cannot write schemas when " +
+				"previous schemas exist in batch mode.")
+			os.Exit(0)
 		}
 
-		if strings.EqualFold(text, "Y") {
-			err := destClient.SetMode(client.IMPORT)
-			if err == false {
-				log.Println("Could not set destination registry to IMPORT Mode.")
+		if !destClient.IsImportModeReady() {
+
+			fmt.Println("Destination Schema Registry is not set to IMPORT mode!")
+			fmt.Println("------------------------------------------------------")
+			fmt.Println("Set to import mode? (Y/n)")
+
+			var text string
+
+			_, err := fmt.Scanln(&text)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			if strings.EqualFold(text, "Y") {
+				err := destClient.SetMode(client.IMPORT)
+				if err == false {
+					log.Println("Could not set destination registry to IMPORT Mode.")
+					os.Exit(0)
+				}
+			} else {
+				log.Println("Cannot export schemas if destination is not set to IMPORT Mode")
 				os.Exit(0)
 			}
-		} else {
-			log.Println("Cannot export schemas if destination is not set to IMPORT Mode")
-			os.Exit(0)
 		}
 	}
 

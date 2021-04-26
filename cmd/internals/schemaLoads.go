@@ -7,12 +7,14 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type SchemaLoader struct {
 	dstClient		*SchemaRegistryClient
 	schemasType		SchemaType			// Define the Loader Type
 	schemaRecords	map[SchemaDescriptor]map[int64]map[string]interface{}	// Internal map of SchemaDescriptor -> version -> unstructured schema
+	path			string
 }
 
 type SchemaDescriptor struct {
@@ -46,16 +48,17 @@ var nativeTypes = map[string]struct{}{
 	Schema Loaders take in the schemas in their natural form, and registers them, this means that if the underlying
 	schema
  */
-func NewSchemaLoader (schemaType SchemaType, dstClient *SchemaRegistryClient) *SchemaLoader {
-	if schemaType == AVRO {
+func NewSchemaLoader (schemaType string, dstClient *SchemaRegistryClient, givenPath string, workingDirectory string) *SchemaLoader {
+	if strings.EqualFold(schemaType,AVRO.String()) {
 		return &SchemaLoader{
 			dstClient:		dstClient,
 			schemasType:  	AVRO,
 			schemaRecords: 	map[SchemaDescriptor]map[int64]map[string]interface{}{},
+			path:			CheckPath(givenPath,workingDirectory),
 		}
-	} else if schemaType == PROTOBUF {
+	} else if strings.EqualFold(schemaType,PROTOBUF.String()) {
 		log.Fatalln("The Protobuf schema load is not supported yet.")
-	} else if schemaType == JSON {
+	} else if strings.EqualFold(schemaType, JSON.String()) {
 		log.Fatalln("The Json schema load is not supported yet.")
 	}
 
@@ -63,28 +66,26 @@ func NewSchemaLoader (schemaType SchemaType, dstClient *SchemaRegistryClient) *S
 	return nil
 }
 
-func (sl *SchemaLoader) run (dstClient *SchemaRegistryClient, givenPath string, workingDirectory string) {
-	sl.loadFromPath(givenPath, workingDirectory)
+func (sl *SchemaLoader) Run () {
+	listenForInterruption()
+	sl.loadFromPath()
 
 	if sl.schemasType == AVRO {
 		for schemaDesc, schemaVersions := range sl.schemaRecords {
-			for schemaVersion, fullSchema := range schemaVersions {
-				sl.registerAvroSchema(schemaDesc, schemaVersion, fullSchema)
+			if CancelRun == true {
+				return
+			}
+			for _, fullSchema := range schemaVersions {
+				sl.maybeRegisterAvroSchema(schemaDesc, fullSchema)
 			}
 		}
 	}
-
-	log.Println("All schemas from given directory are registered!")
-	log.Println("Thanks for using ccloud-schema-exporter!")
 }
 
-func (sl *SchemaLoader) loadFromPath (givenPath string, workingDirectory string) {
-	definedPath := CheckPath(givenPath,workingDirectory)
-
-	listenForInterruption()
+func (sl *SchemaLoader) loadFromPath () {
 
 	if sl.schemasType == AVRO {
-		err := filepath.WalkDir(definedPath, sl.loadAvroFiles)
+		err := filepath.WalkDir(sl.path, sl.loadAvroFiles)
 		check(err)
 	}
 
@@ -96,30 +97,29 @@ func (sl *SchemaLoader) loadFromPath (givenPath string, workingDirectory string)
 
 }
 
-func (sl *SchemaLoader) registerAvroSchema (desc SchemaDescriptor, schemaVer int64, fullSchema map[string]interface{}) bool {
+func (sl *SchemaLoader) maybeRegisterAvroSchema(desc SchemaDescriptor, fullSchema map[string]interface{}) bool {
 
+	thisSchemaName := fmt.Sprintf("%s.%s", desc.namespace, desc.name)
 	thisSchemaReferences := []SchemaReference{}
 
 	// Check there are fields to the schema
 	if fullSchema["fields"] != nil {
-		thisSchemaReferences = sl.getReferencesForAvroSchema(fullSchema["fields"], "type")
-		thisSchemaReferences = append(thisSchemaReferences, sl.getReferencesForAvroSchema(fullSchema["fields"], "values")...)
-		thisSchemaReferences = append(thisSchemaReferences, sl.getReferencesForAvroSchema(fullSchema["fields"], "items")...)
-	} else {
-		log.Fatalln("Could not determine fields in schema!")
+		thisSchemaReferences = sl.getReferencesForAvroSchema(thisSchemaName, fullSchema["fields"])
 	}
 
-	if !sl.dstClient.(desc.namespace+"."+desc.name) {
+	mapAsJsonBytes, err := json.Marshal(fullSchema)
+	check(err)
+	mapAsJsonString := string(mapAsJsonBytes)
+
+	if !sl.dstClient.schemaIsRegisteredUnderSubject(thisSchemaName,
+		"AVRO", mapAsJsonString, thisSchemaReferences) && checkSubjectIsAllowed(thisSchemaName){
+		log.Print("Registering schema with name: " + thisSchemaName)
 		sl.dstClient.RegisterSchema(
-			fmt.Sprintf("%v", fullSchema),
-			desc.namespace+"."+desc.name,
+			mapAsJsonString,
+			thisSchemaName+"-value",
 			"AVRO",
-			thisSchemaReferences,
-		)
+			thisSchemaReferences)
 	}
-
-
-
 	return true
 }
 
@@ -157,65 +157,112 @@ func (sl *SchemaLoader) loadAvroFiles(path string, info os.DirEntry, err error) 
 	return nil
 }
 
-func (sl *SchemaLoader) getReferencesForAvroSchema (fields interface{}, fieldToSwitch string) []SchemaReference {
+func (sl *SchemaLoader) getReferencesForAvroSchema (thisSchemaName string, fields interface{}) []SchemaReference {
 	references := []SchemaReference{}
 
 	switch theseFields := fields.(type) {
-	case []map[string]interface{}:
-		for _, onefield := range theseFields {
-			switch typeOfTypeField := onefield[fieldToSwitch].(type) {
-			case string:
-				_, exists := nativeTypes[typeOfTypeField]
-				if !exists {
-					// If this is a reference, then fill array and register that first
-					//Build SchemaDescriptor for the reference
-					thisReferenceDescriptor := GetAvroSchemaDescriptor(typeOfTypeField)
+	case []interface{}:
+		for _, oneField := range theseFields {
+			switch typecastedField := oneField.(type) {
+			case map[string]interface{}:
+				_, existsType := typecastedField["type"]
+				_, existsValues := typecastedField["values"]
+				_, existsItems := typecastedField["items"]
 
-					versions, refExists := sl.schemaRecords[thisReferenceDescriptor]
-					if !refExists {
-						log.Fatalln("Reference doesn't exist: " + typeOfTypeField)
-					}
-					latestVersionForReference := int64(len(versions))
+				fieldToSwitch := ""
 
-					sl.registerAvroSchema(thisReferenceDescriptor, latestVersionForReference, sl.schemaRecords[thisReferenceDescriptor][latestVersionForReference])
-
-					references = append(references, SchemaReference{
-						Name:    typeOfTypeField,			// The type referenced
-						Subject: typeOfTypeField+"-value", 	// The SchemaDescriptor
-						Version: latestVersionForReference, 		// Latest version of schema descriptor
-					})
-
+				if existsItems {
+					fieldToSwitch = "items"
+				} else if existsValues {
+					fieldToSwitch = "values"
+				} else if existsType {
+					fieldToSwitch = "type"
 				}
-			case []string:
-				for _,oneOfType := range typeOfTypeField {
-					_, exists := nativeTypes[oneOfType]
+
+				switch typeOfTypeField := typecastedField[fieldToSwitch].(type) {
+				case string:
+					_, exists := nativeTypes[typeOfTypeField]
 					if !exists {
 						// If this is a reference, then fill array and register that first
 						//Build SchemaDescriptor for the reference
-						thisReferenceDescriptor := GetAvroSchemaDescriptor(oneOfType)
+						thisReferenceDescriptor := GetAvroSchemaDescriptor(typeOfTypeField)
+						schemaFullName := fmt.Sprintf("%s.%s", thisReferenceDescriptor.namespace, thisReferenceDescriptor.name)
+
 
 						versions, refExists := sl.schemaRecords[thisReferenceDescriptor]
 						if !refExists {
-							log.Fatalln("Reference doesn't exist: " + oneOfType)
+							log.Fatalln("Reference doesn't exist: " + fmt.Sprintf("%v",thisReferenceDescriptor))
 						}
 						latestVersionForReference := int64(len(versions))
 
-						sl.registerAvroSchema(thisReferenceDescriptor, latestVersionForReference, sl.schemaRecords[thisReferenceDescriptor][latestVersionForReference])
+						for versionNum, _ := range versions {
+							log.Println("Register schema reference: " +
+								fmt.Sprintf("%s.%s",thisReferenceDescriptor.namespace, thisReferenceDescriptor.name) +
+								" for schema " + thisSchemaName)
+							sl.maybeRegisterAvroSchema(thisReferenceDescriptor, sl.schemaRecords[thisReferenceDescriptor][versionNum])
+						}
 
-						references = append(references, SchemaReference{
-							Name:    oneOfType,			// The type referenced
-							Subject: oneOfType+"-value", 	// The SchemaDescriptor
-							Version: latestVersionForReference, 		// Latest version of schema descriptor
-						})
+						thisReference := SchemaReference{
+							Name:    schemaFullName,             // The type referenced
+							Subject: schemaFullName + "-value",  // The SchemaDescriptor
+							Version: latestVersionForReference, // Latest version of schema descriptor
+						}
+
+						if !referenceIsInSlice(thisReference, references) {
+							references = append(references, thisReference)
+						}
+
 					}
+				case []interface{}:
+					for _, singleTypeInArray := range typeOfTypeField {
+						switch thisFieldType := singleTypeInArray.(type) {
+						case string:
+							_, exists := nativeTypes[thisFieldType]
+							if !exists {
+								// If this is a reference, then fill array and register that first
+								//Build SchemaDescriptor for the reference
+								thisReferenceDescriptor := GetAvroSchemaDescriptor(thisFieldType)
+								schemaFullName := fmt.Sprintf("%s.%s", thisReferenceDescriptor.namespace, thisReferenceDescriptor.name)
+
+								versions, refExists := sl.schemaRecords[thisReferenceDescriptor]
+								if !refExists {
+									log.Fatalln("Reference doesn't exist: " + fmt.Sprintf("%v",thisReferenceDescriptor))
+								}
+								latestVersionForReference := int64(len(versions)-1)
+
+								for versionNum, _ := range versions {
+									log.Println("Register schema reference: " +
+										fmt.Sprintf("%s.%s",thisReferenceDescriptor.namespace, thisReferenceDescriptor.name) +
+										" for schema " + thisSchemaName)
+									sl.maybeRegisterAvroSchema(thisReferenceDescriptor, sl.schemaRecords[thisReferenceDescriptor][versionNum])
+								}
+
+								thisReference := SchemaReference{
+									Name:    schemaFullName,             // The type referenced
+									Subject: schemaFullName + "-value",  // The SchemaDescriptor
+									Version: latestVersionForReference, // Latest version of schema descriptor
+								}
+
+								if !referenceIsInSlice(thisReference, references) {
+									references = append(references, thisReference)
+								}
+
+							}
+						default:
+							log.Println("Could not cast a type to string: " + fmt.Sprintf("%v", thisFieldType))
+						}
+					}
+				default:
+					log.Println("Could not get types from schema")
+					log.Println(fmt.Sprintf("%v", typeOfTypeField))
 				}
 			default:
-				// Do nothing
+				log.Println("Could not typecast input")
 			}
 		}
-
 	default:
-		log.Println("Could not define the fields in this schema")
+		log.Println("Could not define the field array in this schema")
+		log.Println(fmt.Sprintf("%v", theseFields))
 	}
 
 	return references

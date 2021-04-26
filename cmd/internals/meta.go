@@ -34,6 +34,7 @@ var WithMetrics bool
 var AllowList StringArrayFlag
 var DisallowList StringArrayFlag
 var ReferenceSeparator = "=====References====="
+var SchemaLoadType string
 
 // Define RunMode Enum
 type RunMode int
@@ -43,6 +44,7 @@ const (
 	BATCH
 	TOLOCAL
 	FROMLOCAL
+	SCHEMALOAD
 )
 
 func (r RunMode) String() string {

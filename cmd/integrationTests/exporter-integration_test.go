@@ -6,6 +6,7 @@ package integration
 //
 
 import (
+	"fmt"
 	client "github.com/abraham-leal/ccloud-schema-exporter/cmd/internals"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
@@ -52,6 +53,26 @@ func setup() {
 
 func tearDown() {
 	composeEnv.WithCommand([]string{"down", "-v"}).Invoke()
+}
+
+func TestSchemaLoad (t *testing.T) {
+	log.Println("Testing Schema Load: AVRO!")
+
+	setImportMode()
+	cleanup()
+
+	client.DisallowList = map[string]bool{
+		"com.mycorp.somethinghere.sampleRecordreferencing": true,
+		"reference": true,
+		"someReferencingSubject": true,
+		"com.mycorp.wassup.value_newnew" : true,
+	}
+
+	testClientDst.SetMode(client.READWRITE)
+	// Do not account for value_newnew
+	testSchemaLoadAvro(t, registrationCount-3)
+
+	client.DisallowList = nil
 }
 
 func TestExportMode(t *testing.T) {
@@ -480,6 +501,61 @@ func testLocalCopy(t *testing.T, expectedFilesToWrite int) {
 	assert.Equal(t, expectedFilesToWrite, count)
 	assert.Equal(t, expectedFilesToWrite, len(files2))
 
+}
+
+func testSchemaLoadAvro(t *testing.T, expectedLoadNumber int) {
+
+	currentPath, _ := os.Getwd()
+	currentPath = filepath.Clean(currentPath)
+	testClientDst.DeleteAllSubjectsPermanently()
+
+	// Test Relative Paths
+	err := os.Mkdir(currentPath+localRelativePath, 0755)
+	if err != nil {
+		panic(err)
+	}
+
+	defer os.RemoveAll(currentPath + localRelativePath)
+	client.WriteToFS(testClientSrc, "testingLocalBackupRelativePath", currentPath)
+
+	schemaReferenceForSchemaLoad := "{\"type\": \"record\",\"namespace\": \"com.mycorp.schemaLoad\",\"name\": \"value_reference\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"}]}"
+
+	schemaReferencerSchemaLoad := "{\"type\": \"record\",\"namespace\": \"com.mycorp.schemaLoad\",\"name\": \"value_referencing\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"com.mycorp.schemaLoad.value_reference\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
+
+	filename1 := fmt.Sprintf("someSchemaLoad1")
+	filename2 := fmt.Sprintf("someSchemaLoad2")
+	f1, err := os.Create(filepath.Join(currentPath + localRelativePath, filename1))
+	if err != nil {
+		panic(err)
+	}
+	f2, err := os.Create(filepath.Join(currentPath + localRelativePath, filename2))
+	_, err = f1.WriteString(schemaReferencerSchemaLoad)
+	if err != nil {
+		panic(err)
+	}
+	_, err = f2.WriteString(schemaReferenceForSchemaLoad)
+	if err != nil {
+		panic(err)
+	}
+	f1.Close()
+	f2.Close()
+
+	avroLoader := client.NewSchemaLoader(client.AVRO.String(), testClientDst, "testingLocalBackupRelativePath", currentPath)
+	avroLoader.Run()
+
+	dstSubj := client.GetCurrentSubjectState(testClientDst)
+
+	count := 0
+	// Get total schema count
+	for _, versions := range dstSubj {
+		for _, _ = range versions {
+			count = count + 1
+		}
+	}
+
+	testClientDst.DeleteAllSubjectsPermanently()
+
+	assert.Equal(t, expectedLoadNumber, count)
 }
 
 func commonSyncTest(t *testing.T, lenOfDestSubjects int) {

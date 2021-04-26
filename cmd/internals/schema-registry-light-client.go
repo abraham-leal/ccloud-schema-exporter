@@ -515,3 +515,24 @@ func (src *SchemaRegistryClient) subjectExists(subject string) bool {
 		return false
 	}
 }
+
+func (src *SchemaRegistryClient) schemaIsRegisteredUnderSubject(subject string, schemaType string, schema string, references []SchemaReference) bool {
+	endpoint := fmt.Sprintf("%s/subjects/%s", src.SRUrl, url.QueryEscape(subject))
+
+	schemaRequest := SchemaToRegister{Schema: schema, SType: schemaType, References: references}
+
+	schemaJSON, err := json.Marshal(schemaRequest)
+	if err != nil {
+		log.Printf(err.Error())
+	}
+
+	sbjReq := GetNewRequest("POST", endpoint, src.SRApiKey, src.SRApiSecret, nil, bytes.NewReader(schemaJSON))
+	response, err := httpClient.Do(sbjReq)
+	defer response.Body.Close()
+
+	if response.StatusCode > 400 {
+		return false
+	}
+
+	return true
+}

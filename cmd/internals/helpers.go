@@ -58,6 +58,15 @@ func isInSlice(i int64, list []int64) bool {
 	return false
 }
 
+func referenceIsInSlice(i SchemaReference, list []SchemaReference) bool {
+	for _, current := range list {
+		if current == i {
+			return true
+		}
+	}
+	return false
+}
+
 // Returns an HTTP request with the given information to execute
 func GetNewRequest(method string, endpoint string, key string, secret string, headers map[string]string, reader io.Reader) *http.Request {
 	req, err := http.NewRequest(method, endpoint, reader)
@@ -429,11 +438,11 @@ func GetAvroSchemaDescriptor (fullReferenceName string) SchemaDescriptor {
 	}
 
 	namespace := fullReferenceName[:lastDot]
-	name := fullReferenceName[lastDot:]
+	name := fullReferenceName[lastDot+1:]
 
 	thisDescriptor := SchemaDescriptor{
-		namespace: namespace,
-		name:      name,
+		namespace: strings.TrimSpace(namespace),
+		name:      strings.TrimSpace(name),
 	}
 
 	return thisDescriptor
