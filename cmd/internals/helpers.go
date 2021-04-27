@@ -429,9 +429,9 @@ func RegisterReferencesFromLocalFS(referencesToRegister []SchemaReference, dstCl
 	check(err)
 }
 
-func GetAvroSchemaDescriptor (fullReferenceName string) SchemaDescriptor {
+func GetAvroSchemaDescriptor(fullReferenceName string) SchemaDescriptor {
 
-	lastDot := strings.LastIndex(fullReferenceName,".")
+	lastDot := strings.LastIndex(fullReferenceName, ".")
 
 	if lastDot == -1 {
 		return SchemaDescriptor{}
@@ -446,4 +446,18 @@ func GetAvroSchemaDescriptor (fullReferenceName string) SchemaDescriptor {
 	}
 
 	return thisDescriptor
+}
+
+func WriteFile(path string, filename string, contents string) {
+
+	fileNameEscaped := fmt.Sprintf("%s", url.QueryEscape(filename))
+	fullPath := filepath.Join(path, fileNameEscaped)
+	log.Printf("Writing file: %s", fullPath)
+
+	f, err := os.Create(fullPath)
+	check(err)
+	defer f.Close()
+
+	_, err = f.WriteString(contents)
+	check(err)
 }

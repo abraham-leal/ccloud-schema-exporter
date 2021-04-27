@@ -2,14 +2,14 @@
 
 [![Build](https://travis-ci.com/abraham-leal/ccloud-schema-exporter.svg?branch=master)]() [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=abraham-leal_ccloud-schema-exporter&metric=alert_status)](https://sonarcloud.io/dashboard?id=abraham-leal_ccloud-schema-exporter)
 
-A tool to export schemas from a Confluent Schema Registry to another.
-This app supports five modes: `batchExport`, `sync`, `getLocalCopy`, `fromLocalCopy`, and `schemaLoadType`.
+A tool to export schemas from a Confluent Schema Registry to another through the REST API.
+This app supports five modes: `batchExport`, `sync`, `getLocalCopy`, `fromLocalCopy`, and `schemaLoad`.
 
-- `batchExport` will do a one time migration between schema registries, then it will reset the destination registry to `READWRTIE` mode.
 - `sync` will continuously sync newly registered schemas into the destination registry.
+- `batchExport` will do a one time migration between schema registries, then it will reset the destination registry to `READWRTIE` mode.
 - `getLocalCopy` will fetch and write local copies of Schema Registry's Schemas.
 - `fromLocalCopy` will write schemas fetched by `getLocalCopy` to the destination Schema Registry.
-- `schemaLoadType` will write schemas from your local directory to Schema Registry.
+- `schemaLoad` will write schemas from your local directory to Schema Registry.
 
 This tool supports migrating from self-hosted Schema Registries as well, but if you are looking to migrate schemas
 between On-Premise and Confluent Cloud, check out
@@ -68,10 +68,10 @@ into local files with naming structure subjectName-version-id-schemaType per sch
 - `./ccloud-schema-exporter -fromLocalCopy` : Running the app with this flag will write schemas previously fetched. 
 It relies on the naming convention of `-getLocalCopy` to obtain the necessary metadata to register the schemas. 
 The default directory is {currentPath}/SchemaRegistryBackup/. The file lookup is recursive from the specified directory.
-- `./ccloud-schema-exporter -schemaLoadType` : Running the app with this flag will write schemas from the filesystem.
+- `./ccloud-schema-exporter -schemaLoad` : Running the app with this flag will write schemas from the filesystem.
 The schema loader respects references. For more information on behavior, see the Schema Load section.
 
-When multiple flags are applied, prevalence is `sync` -> `batchExport` -> `getLocalCopy` -> `fromLocalCopy` -> `schemaLoadType`
+When multiple flags are applied, prevalence is `sync` -> `batchExport` -> `getLocalCopy` -> `fromLocalCopy` -> `schemaLoad`
 
 NOTE: Given that the exporter cannot determine a per-subject compatibility rule, it is recommended to set the destination schema registry compatibility level to `NONE` on first sync and restore it to the source's level afterwards.
 
@@ -106,7 +106,7 @@ Usage of ./ccloud-schema-exporter:
     	Optional custom path for local functions. This must be an existing directory structure.
   -noPrompt
     	Set this flag to avoid checks while running. Assure you have the destination SR to correct Mode and Compatibility.
-  -schemaLoadType string
+  -schemaLoad string
         Schema Type for the load. Currently supported: AVRO
   -scrapeInterval int
     	Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds (default 60)
@@ -271,13 +271,13 @@ The following options are respected for custom sources / destinations as well:
 ````
 
 
-#### Schema Loads (Beta)
+#### Schema Loads
 
-Schema Loads are a new feature and is continually improving. In this first release, `ccloud-schema-exporter` supports AVRO schema loads.
-Through defining a `-schemaLoadType` and `-localPath`, the tool will register all avro schemas it finds, including references.
+`ccloud-schema-exporter` supports AVRO schema loads through defining a `-schemaLoad` and `-localPath`, 
+the tool will register all avro schemas it finds recursively in that path, including references.
 It will utilize the RecordNamingStrategy to name the subjects.
 
-Schema Loads support schema versions. All versions of a schema will be registered. Versions are decided 
+Schema Loads support schema versioning. All versions of a schema will be registered. Versions are decided 
 according to the lexicographical order of the files (for example, a file named `orders_v1` will be registered before `orders_v2`).
 References are also versioned; However, only the latest version of reference will be referenced by other schemas.
 
