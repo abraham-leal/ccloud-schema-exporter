@@ -22,7 +22,7 @@ func GetFlags() {
 	flag.StringVar(&DestSRSecret, "dest-sr-secret", "", "API SECRET for the Destination Schema Registry Cluster")
 	flag.StringVar(&CustomDestinationName, "customDestination", "", "Name of the implementation to be used as a destination (same as mapping)")
 	flag.StringVar(&CustomSourceName, "customSource", "", "Name of the implementation to be used as a source (same as mapping)")
-	flag.StringVar(&SchemaLoadType, "schemaLoadType", "", "Schema Type for the load. Currently supported: AVRO")
+	flag.StringVar(&SchemaLoadType, "schemaLoad", "", "Schema Type for the load. Currently supported: AVRO")
 	flag.IntVar(&HttpCallTimeout, "timeout", 60, "Timeout, in seconds, to use for all REST calls with the Schema Registries")
 	flag.IntVar(&ScrapeInterval, "scrapeInterval", 60, "Amount of time ccloud-schema-exporter will delay between schema sync checks in seconds")
 	flag.StringVar(&PathToWrite, "localPath", "",

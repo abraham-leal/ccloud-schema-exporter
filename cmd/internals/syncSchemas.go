@@ -6,7 +6,6 @@ package client
 //
 
 import (
-	"encoding/json"
 	"log"
 	"reflect"
 	"strconv"
@@ -115,38 +114,6 @@ func syncExistingSoftDeletedSubjects(srcClient *SchemaRegistryClient, destClient
 						softDeletedSchema.Subject, softDeletedSchema.Id, softDeletedSchema.Version, softDeletedSchema.SType, softDeletedSchema.References)
 					destClient.PerformSoftDelete(softDeletedSchema.Subject, softDeletedSchema.Version)
 				}
-			}
-		}
-	}
-}
-
-// Registers the schema references given in the SchemaRecord, recursively
-func RegisterReferences(wrappingSchema SchemaRecord, srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient, deleted bool) {
-	if len(wrappingSchema.References) != 0 {
-		log.Printf("Registering references for subject %s and version %d", wrappingSchema.Subject, wrappingSchema.Version)
-		for _, schemaReference := range wrappingSchema.References {
-			schema := srcClient.GetSchema(schemaReference.Subject, schemaReference.Version, deleted)
-
-			if len(schema.References) != 0 {
-				RegisterReferences(schema, srcClient, destClient, deleted)
-			}
-
-			schemaAlreadyRegistered := new(SchemaAlreadyRegisteredResponse)
-
-			responseBody := destClient.RegisterSchemaBySubjectAndIDAndVersion(schema.Schema,
-				schema.Subject,
-				schema.Id,
-				schema.Version,
-				schema.SType,
-				schema.References)
-
-			err := json.Unmarshal(responseBody, &schemaAlreadyRegistered)
-
-			if err == nil {
-				log.Printf("Reference schema subject %s was already written with version: %d and ID: %d", schema.Subject, schema.Version, schema.Id)
-			} else {
-				log.Printf("Registering referenced schema: %s with version: %d and ID: %d and Type: %s",
-					schema.Subject, schema.Version, schema.Id, schema.SType)
 			}
 		}
 	}
