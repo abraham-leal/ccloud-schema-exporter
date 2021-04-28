@@ -42,6 +42,7 @@ var schemaReferenceForSchemaLoad = "{\"type\": \"record\",\"namespace\": \"com.m
 var schemaReferenceForSchemaLoadEvolved = "{\"type\": \"record\",\"namespace\": \"com.mycorp.schemaLoad\",\"name\": \"value_reference\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
 var schemaReferencerSchemaLoad = "{\"type\": \"record\",\"namespace\": \"com.mycorp.schemaLoad\",\"name\": \"value_referencing\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"com.mycorp.schemaLoad.value_reference\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
 var schemaToReference = "{\"type\":\"record\",\"name\":\"reference\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"},{\"name\":\"someField2\",\"type\":\"int\"}]}"
+var schemaToReferenceFinal = "{\"type\":\"record\",\"name\":\"referenceWithDepth\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"}]}"
 var schemaReferencing = "{\"type\":\"record\",\"name\":\"sampleRecordreferencing\",\"namespace\":\"com.mycorp.somethinghere\",\"fields\":[{\"name\":\"reference\",\"type\":\"com.reference.reference\"}]}"
 
 /*
