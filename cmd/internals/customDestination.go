@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// Runner for the custom destination sync job
 func RunCustomDestinationSync(srcClient *SchemaRegistryClient, customDest CustomDestination) {
 	err := customDest.SetUp()
 	if err != nil {
@@ -53,6 +54,7 @@ func RunCustomDestinationSync(srcClient *SchemaRegistryClient, customDest Custom
 	}
 }
 
+// Runner of the batch job for custom destination
 func RunCustomDestinationBatch(srcClient *SchemaRegistryClient, customDest CustomDestination) {
 	err := customDest.SetUp()
 	if err != nil {
@@ -86,6 +88,7 @@ func RunCustomDestinationBatch(srcClient *SchemaRegistryClient, customDest Custo
 	}
 }
 
+// Sync function for custom destination
 func customDestSync(diff map[string][]int64, srcClient *SchemaRegistryClient, customDest CustomDestination) {
 	if len(diff) != 0 {
 		log.Println("Source registry has values that Destination does not, syncing...")
@@ -103,14 +106,14 @@ func customDestSync(diff map[string][]int64, srcClient *SchemaRegistryClient, cu
 	}
 }
 
+// Function to delete the schemas that have been deleted (whether soft or hard deleted) in the source Schema Registry.
 func customDestSyncDeletes(destSubjects map[string][]int64, srcSubjects map[string][]int64, srcClient *SchemaRegistryClient, customDest CustomDestination) {
 	diff := GetSubjectDiff(destSubjects, srcSubjects)
 	if len(diff) != 0 {
 		log.Println("Source registry has deletes that Destination does not, syncing...")
 		for subject, versions := range diff {
 			for _, v := range versions {
-				schema := srcClient.GetSchema(subject, v, false)
-				err := customDest.DeleteSchema(schema)
+				err := customDest.DeleteSchema(subject, v)
 				checkCouldNotRegister(err)
 			}
 		}
@@ -148,16 +151,19 @@ func (cd *SampleCustomDestination) RegisterSchema(record SchemaRecord) error {
 	return nil
 }
 
-func (cd *SampleCustomDestination) DeleteSchema(record SchemaRecord) error {
-	currentVersionSlice, exists := cd.inMemState[record.Subject]
+func (cd *SampleCustomDestination) DeleteSchema(subject string, version int64) error {
+	currentVersionSlice, exists := cd.inMemState[subject]
 	newSlice := currentVersionSlice
 	if exists {
 		for index, v := range currentVersionSlice {
-			if v == record.Version {
+			if v == version {
 				newSlice = removeFromSlice(currentVersionSlice, index)
 			}
 		}
-		cd.inMemState[record.Subject] = newSlice
+		cd.inMemState[subject] = newSlice
+		if len(cd.inMemState[subject]) == 0 {
+			delete(cd.inMemState, subject)
+		}
 	}
 	return nil
 }

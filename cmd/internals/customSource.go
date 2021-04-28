@@ -17,6 +17,7 @@ import (
 	"time"
 )
 
+// Runner for the custom source sync mode
 func RunCustomSourceSync(dstClient *SchemaRegistryClient, customSrc CustomSource) {
 	err := customSrc.SetUp()
 	if err != nil {
@@ -60,6 +61,7 @@ func RunCustomSourceSync(dstClient *SchemaRegistryClient, customSrc CustomSource
 	return
 }
 
+// Sync job for custom source
 func customSrcSync(diff map[string][]int64, dstClient *SchemaRegistryClient, customSrc CustomSource) {
 	if len(diff) != 0 {
 		log.Println("Custom Source has values that Schema Registry does not, syncing...")
@@ -70,17 +72,30 @@ func customSrcSync(diff map[string][]int64, dstClient *SchemaRegistryClient, cus
 					log.Println("Could not retrieve schema from custom source")
 				}
 				if checkSubjectIsAllowed(sbj) {
+					thisSchemaRecord := SchemaRecord{
+						Subject:    sbj,
+						Schema:     schema,
+						SType:      stype,
+						Version:    v,
+						Id:         id,
+						References: references,
+					}
+					// Assure References are registered first
+					RegisterReferencesWithCustomSource(thisSchemaRecord, customSrc, dstClient)
 					log.Println("Registering new schema: " + sbj +
 						" with version: " + strconv.FormatInt(v, 10) +
 						" and ID: " + strconv.FormatInt(id, 10) +
 						" and Type: " + stype)
-					dstClient.RegisterSchemaBySubjectAndIDAndVersion(schema, sbj, id, v, stype, references)
+					dstClient.RegisterSchemaBySubjectAndIDAndVersion(thisSchemaRecord.Schema,
+						thisSchemaRecord.Subject, thisSchemaRecord.Id, thisSchemaRecord.Version,
+						thisSchemaRecord.SType, thisSchemaRecord.References)
 				}
 			}
 		}
 	}
 }
 
+// Sync deletes for custom source, this performs hard deleted in the Schema Registry
 func customSrcSyncDeletes(destSubjects map[string][]int64, srcSubjects map[string][]int64, dstClient *SchemaRegistryClient, customSrc CustomSource) {
 	diff := GetSubjectDiff(destSubjects, srcSubjects)
 	if len(diff) != 0 {
@@ -88,14 +103,18 @@ func customSrcSyncDeletes(destSubjects map[string][]int64, srcSubjects map[strin
 		for sbj, versions := range diff {
 			for _, v := range versions {
 				if checkSubjectIsAllowed(sbj) {
-					dstClient.PerformSoftDelete(sbj, v)
-					dstClient.PerformHardDelete(sbj, v)
+					if dstClient.subjectExists(sbj) {
+						if dstClient.PerformSoftDelete(sbj, v) {
+							dstClient.PerformHardDelete(sbj, v)
+						}
+					}
 				}
 			}
 		}
 	}
 }
 
+// Runner for the batch job of custom source
 func RunCustomSourceBatch(dstClient *SchemaRegistryClient, customSrc CustomSource) {
 	err := customSrc.SetUp()
 	if err != nil {
@@ -124,11 +143,66 @@ func RunCustomSourceBatch(dstClient *SchemaRegistryClient, customSrc CustomSourc
 				log.Println("Could not retrieve schema from custom source")
 			} else {
 				if checkSubjectIsAllowed(sbj) {
+					thisSchemaRecord := SchemaRecord{
+						Subject:    sbj,
+						Schema:     schema,
+						SType:      stype,
+						Version:    v,
+						Id:         id,
+						References: references,
+					}
+					// Assure references are registered first
+					RegisterReferencesWithCustomSource(thisSchemaRecord, customSrc, dstClient)
 					log.Printf("Registering schema: %s with version: %d and ID: %d and Type: %s",
 						sbj, v, id, stype)
-					dstClient.RegisterSchemaBySubjectAndIDAndVersion(schema, sbj, id, v, stype, references)
+					dstClient.RegisterSchemaBySubjectAndIDAndVersion(thisSchemaRecord.Schema,
+						thisSchemaRecord.Subject, thisSchemaRecord.Id, thisSchemaRecord.Version,
+						thisSchemaRecord.SType, thisSchemaRecord.References)
 				}
+			}
+		}
+	}
+}
 
+
+// Registers the schema references given in the SchemaRecord, recursively, for a custom source
+func RegisterReferencesWithCustomSource(wrappingSchema SchemaRecord, customSrc CustomSource, destClient *SchemaRegistryClient) {
+	if len(wrappingSchema.References) != 0 {
+		log.Printf("Registering references for subject %s and version %d", wrappingSchema.Subject, wrappingSchema.Version)
+		for _, schemaReference := range wrappingSchema.References {
+			schemaId, schemaType, schemaString, schemaReferencesWithin, err:= customSrc.GetSchema(schemaReference.Subject, schemaReference.Version)
+			if err != nil {
+				log.Println("Could not retrieve schema from custom source")
+			}
+			if len(schemaReferencesWithin) != 0 {
+				thisReferenceSchemaRecord := SchemaRecord{
+					Subject:    schemaReference.Subject,
+					Schema:     schemaString,
+					SType:      schemaType,
+					Version:    schemaReference.Version,
+					Id:         schemaId,
+					References: schemaReferencesWithin,
+				}
+				RegisterReferencesWithCustomSource(thisReferenceSchemaRecord, customSrc, destClient)
+			}
+
+			schemaAlreadyRegistered := new(SchemaAlreadyRegisteredResponse)
+
+			responseBody := destClient.RegisterSchemaBySubjectAndIDAndVersion(schemaString,
+				schemaReference.Subject,
+				schemaId,
+				schemaReference.Version,
+				schemaType,
+				schemaReferencesWithin)
+
+			err = json.Unmarshal(responseBody, &schemaAlreadyRegistered)
+
+			if err == nil {
+				log.Printf("Reference schema subject %s was already written with version: %d and ID: %d",
+					schemaReference.Subject, schemaReference.Version, schemaId)
+			} else {
+				log.Printf("Registering referenced schema: %s with version: %d and ID: %d and Type: %s",
+					schemaReference.Subject, schemaReference.Version, schemaId, schemaType)
 			}
 		}
 	}
@@ -138,7 +212,6 @@ func RunCustomSourceBatch(dstClient *SchemaRegistryClient, customSrc CustomSourc
 This is an example of a custom source.
 This example uses Apicurio Registry as the source.
 */
-
 func NewApicurioSource() ApicurioSource {
 	apicurioOptionsVar := os.Getenv("APICURIO_OPTIONS")
 	apicurioOptionsMap := map[string]string{}
@@ -172,6 +245,7 @@ func NewInMemRegistry(records []SchemaRecord) inMemRegistry {
 			SType:   record.SType,
 			Version: record.Version,
 			Id:      record.Id,
+			References: record.References,
 		}
 	}
 
@@ -192,7 +266,7 @@ func (iM inMemRegistry) SetUp() error {
 func (iM inMemRegistry) GetSchema(sbj string, version int64) (id int64, stype string, schema string, references []SchemaReference, err error) {
 	for _, schemaRecord := range iM.inMemSchemas {
 		if schemaRecord.Subject == sbj && schemaRecord.Version == version {
-			return schemaRecord.Id, schemaRecord.SType, schemaRecord.Schema, nil, nil
+			return schemaRecord.Id, schemaRecord.SType, schemaRecord.Schema, schemaRecord.References, nil
 		}
 	}
 	return 0, "", "", nil, fmt.Errorf("schema not found")
@@ -282,7 +356,7 @@ func (ap *ApicurioSource) GetSchema(subject string, version int64) (id int64, st
 	checkDontFail(err)
 	schemaResponse.Body.Close()
 
-	return metaResponseContainer.GlobalId, metaResponseContainer.Stype, string(schemaBody), references, nil
+	return metaResponseContainer.GlobalId, metaResponseContainer.Stype, string(schemaBody), nil, nil
 }
 
 func (ap *ApicurioSource) GetSourceState() (map[string][]int64, error) {

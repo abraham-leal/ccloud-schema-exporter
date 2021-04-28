@@ -36,6 +36,7 @@ func TCustomDestinationSync(t *testing.T) {
 	myTestCustomDestination := NewSampleCustomDestination()
 
 	ScrapeInterval = 3
+	SyncDeletes = true
 	go RunCustomDestinationSync(testClient, &myTestCustomDestination)
 	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
 
@@ -46,6 +47,14 @@ func TCustomDestinationSync(t *testing.T) {
 
 	assert.True(t, exists1)
 	assert.True(t, exists2)
+
+	// Test Delete
+	testClient.PerformSoftDelete(newSubject, 1)
+	testClient.PerformHardDelete(newSubject, 1)
+	time.Sleep(time.Duration(4) * time.Second) // Give time for sync
+
+	_, exists3 := myTestCustomDestination.inMemState[newSubject]
+	assert.False(t, exists3)
 
 	CancelRun = true
 	time.Sleep(time.Duration(4) * time.Second) // Give time for killing goroutine

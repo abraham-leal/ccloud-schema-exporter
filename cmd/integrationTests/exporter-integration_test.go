@@ -44,6 +44,12 @@ var schemaReferencerSchemaLoad = "{\"type\": \"record\",\"namespace\": \"com.myc
 var schemaToReference = "{\"type\":\"record\",\"name\":\"reference\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"},{\"name\":\"someField2\",\"type\":\"int\"}]}"
 var schemaReferencing = "{\"type\":\"record\",\"name\":\"sampleRecordreferencing\",\"namespace\":\"com.mycorp.somethinghere\",\"fields\":[{\"name\":\"reference\",\"type\":\"com.reference.reference\"}]}"
 
+/*
+	General Integration Testing Framework for the ccloud-schema-exporter.
+	To register more schemas for testing, add to setupSource() and make sure to use registerAtSource to register the
+	schema in the source Schema Registry.
+ */
+
 func TestMain(m *testing.M) {
 	setup()
 	code := m.Run()
@@ -304,8 +310,15 @@ func setupSource() {
 		}
 	}
 
+	// One More depth level
+	registerAtSource(schemaToReferenceFinal, "referenceWithDepth", 12344, 1, "AVRO", nil)
+	referenceStructDepth := client.SchemaReference{
+		Name:    "com.reference.referenceWithDepth",
+		Subject: "referenceWithDepth",
+		Version: 1,
+	}
 	// Register referencing test
-	registerAtSource(schemaToReference, "reference", 12345, 1, "AVRO", nil)
+	registerAtSource(schemaToReference, "reference", 12345, 1, "AVRO", []client.SchemaReference{referenceStructDepth})
 	referenceStruct := client.SchemaReference{
 		Name:    "com.reference.reference",
 		Subject: "reference",
