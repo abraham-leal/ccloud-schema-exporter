@@ -91,7 +91,7 @@ func (sl *SchemaLoader) Run() {
 func (sl *SchemaLoader) loadFromPath() {
 
 	if sl.schemasType == AVRO {
-		err := filepath.WalkDir(sl.path, sl.loadAvroFiles)
+		err := filepath.Walk(sl.path, sl.loadAvroFiles)
 		check(err)
 	}
 
@@ -132,7 +132,7 @@ func (sl *SchemaLoader) maybeRegisterAvroSchema(desc SchemaDescriptor, version i
 	return false
 }
 
-func (sl *SchemaLoader) loadAvroFiles(path string, info os.DirEntry, err error) error {
+func (sl *SchemaLoader) loadAvroFiles(path string, info os.FileInfo, err error) error {
 	check(err)
 
 	if !info.IsDir() {
