@@ -18,7 +18,7 @@ https://docs.confluent.io/current/connect/kafka-connect-replicator/index.html[Co
 (Dummy values can be placed for non-secured Schema Registries)
 
 The exporter expects the following variables to be set in the environment to make the necessary calls:
-(In the case of `-getLocalCopy` and `-customDestination` it does not need `DST_*` variables; In the case of `-fromLocalCopy` and `-customSource` it does not need `SRC_*` variables)
+(In the case of `-getLocalCopy` and `-customDestination` it does not need `DST_*` variables; In the case of `-fromLocalCopy`, `-schemaLoad`, and `-customSource` it does not need `SRC_*` variables)
 
 - `SRC_SR_URL` : The URL for the source Schema Registry
 - `SRC_API_KEY` : The API KEY to be used to make calls to the source Schema Registry
@@ -74,7 +74,7 @@ The default directory is {currentPath}/SchemaRegistryBackup/. The file lookup is
 - `./ccloud-schema-exporter -schemaLoad` : Running the app with this flag will write schemas from the filesystem.
 The schema loader respects references. For more information on behavior, see the Schema Load section.
 
-When multiple flags are applied, prevalence is `sync` -> `batchExport` -> `getLocalCopy` -> `fromLocalCopy` -> `schemaLoad`
+When multiple flags are applied, precedence is `sync` -> `batchExport` -> `getLocalCopy` -> `fromLocalCopy` -> `schemaLoad`
 
 NOTE: Given that the exporter cannot determine a per-subject compatibility rule, it is recommended to set the destination schema registry compatibility level to `NONE` on first sync and restore it to the source's level afterwards.
 
