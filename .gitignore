@@ -1,8 +1,7 @@
 .idea/
 /.env
 /ccloud-schema-exporter
-/export_env.sh
-/export_env_cclouds.sh
+/export_env*
 /testk8s.yml
 /apicurio-compose.yml
 /LICENSE

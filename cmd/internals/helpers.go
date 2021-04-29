@@ -12,8 +12,11 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 )
 
@@ -47,6 +50,15 @@ func fileExists(filename string) bool {
 }
 
 func isInSlice(i int64, list []int64) bool {
+	for _, current := range list {
+		if current == i {
+			return true
+		}
+	}
+	return false
+}
+
+func referenceIsInSlice(i SchemaReference, list []SchemaReference) bool {
 	for _, current := range list {
 		if current == i {
 			return true
@@ -104,6 +116,9 @@ func checkSubjectIsAllowed(subject string) bool {
 // Deletes all registered schemas from the destination SR
 func deleteAllFromDestination(sr string, key string, secret string) {
 	destClient := NewSchemaRegistryClient(sr, key, secret, "dst")
+	if !destClient.IsReachable() {
+		log.Fatalln("Could not reach source registry. Possible bad credentials?")
+	}
 	destClient.DeleteAllSubjectsPermanently()
 }
 
@@ -370,3 +385,80 @@ func listenForInterruption() {
 	}()
 }
 
+func RegisterReferences(wrappingSchema SchemaRecord, srcClient *SchemaRegistryClient, destClient *SchemaRegistryClient, deleted bool) {
+	if len(wrappingSchema.References) != 0 {
+		log.Printf("Registering references for subject %s and version %d", wrappingSchema.Subject, wrappingSchema.Version)
+		log.Println(len(wrappingSchema.References))
+		for _, schemaReference := range wrappingSchema.References {
+
+			schema := srcClient.GetSchema(schemaReference.Subject, schemaReference.Version, deleted)
+
+			if !destClient.schemaIsRegisteredUnderSubject(schema.Subject, schema.SType, schema.Schema, schema.References) {
+				log.Printf("Registering referenced schema: %s with version: %d and ID: %d and Type: %s",
+					schema.Subject, schema.Version, schema.Id, schema.SType)
+				RegisterReferences(schema, srcClient, destClient, deleted)
+				destClient.RegisterSchemaBySubjectAndIDAndVersion(schema.Schema,
+					schema.Subject,
+					schema.Id,
+					schema.Version,
+					schema.SType,
+					schema.References)
+				continue
+			}
+
+			log.Printf("Reference schema subject %s was already written with version: %d and ID: %d",
+				schema.Subject, schema.Version, schema.Id)
+
+		}
+	}
+}
+
+func RegisterReferencesFromLocalFS(referencesToRegister []SchemaReference, dstClient *SchemaRegistryClient, pathToLookForReferences string) {
+
+	err := filepath.Walk(pathToLookForReferences,
+		func(path string, info os.FileInfo, err error) error {
+			check(err)
+			for _, oneRef := range referencesToRegister {
+				if !info.IsDir() && strings.Contains(info.Name(), fmt.Sprintf("%s-%d", url.QueryEscape(oneRef.Subject), oneRef.Version)) {
+					log.Println(fmt.Sprintf("Writing referenced schema with Subject: %s and Version: %d. Filepath: %s", oneRef.Subject, oneRef.Version, path))
+					writeSchemaToSR(dstClient, path)
+				}
+			}
+
+			return nil
+		})
+	check(err)
+}
+
+func GetAvroSchemaDescriptor(fullReferenceName string) SchemaDescriptor {
+
+	lastDot := strings.LastIndex(fullReferenceName, ".")
+
+	if lastDot == -1 {
+		return SchemaDescriptor{}
+	}
+
+	namespace := fullReferenceName[:lastDot]
+	name := fullReferenceName[lastDot+1:]
+
+	thisDescriptor := SchemaDescriptor{
+		namespace: strings.TrimSpace(namespace),
+		name:      strings.TrimSpace(name),
+	}
+
+	return thisDescriptor
+}
+
+func WriteFile(path string, filename string, contents string) {
+
+	fileNameEscaped := fmt.Sprintf("%s", url.QueryEscape(filename))
+	fullPath := filepath.Join(path, fileNameEscaped)
+	log.Printf("Writing file: %s", fullPath)
+
+	f, err := os.Create(fullPath)
+	check(err)
+	defer f.Close()
+
+	_, err = f.WriteString(contents)
+	check(err)
+}

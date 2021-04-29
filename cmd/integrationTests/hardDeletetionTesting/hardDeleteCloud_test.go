@@ -47,7 +47,7 @@ func TestSyncModeHardDeletes(t *testing.T) {
 
 	setImportMode()
 
-	testClientSrc.RegisterSchema(newSchema, testingSubjectKey, "AVRO")
+	testClientSrc.RegisterSchema(newSchema, testingSubjectKey, "AVRO", nil)
 
 	client.AllowList = map[string]bool{
 		testingSubjectKey: true,
@@ -159,8 +159,8 @@ func getCurrentState() (map[string][]int64, map[string][]int64) {
 	srcChan := make(chan map[string][]int64)
 	destChan := make(chan map[string][]int64)
 
-	go testClientSrc.GetSubjectsWithVersions(srcChan)
-	go testClientDst.GetSubjectsWithVersions(destChan)
+	go testClientSrc.GetSubjectsWithVersions(srcChan, false)
+	go testClientDst.GetSubjectsWithVersions(destChan, false)
 
 	srcSubjects = <-srcChan
 	destSubjects = <-destChan

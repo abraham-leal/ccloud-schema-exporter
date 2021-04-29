@@ -31,6 +31,20 @@ var registrationCount = 0
 var registeredSubjectCount = 0
 var seenSubjects map[string]string
 
+// Schemas for testing
+var schema = "{\"type\": \"record\",\"namespace\": \"com.mycorp.mynamespace\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"},{\"name\": \"too\",\"type\": \"string\",\"doc\": \"The string is a unicode character sequence.\"}]}"
+var schema2 = "{\"type\": \"record\",\"namespace\": \"com.mycorp.mynamespace\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"}]}"
+var schema3 = "{\"type\": \"record\",\"namespace\": \"com.mycorp.mynamespace\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
+var schema4 = "{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"},{\"name\": \"too\",\"type\": \"string\",\"doc\": \"The string is a unicode character sequence.\"}]}"
+var schema5 = "{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"}]}"
+var schema6 = "{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
+var schemaReferenceForSchemaLoad = "{\"type\": \"record\",\"namespace\": \"com.mycorp.schemaLoad\",\"name\": \"value_reference\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"}]}"
+var schemaReferenceForSchemaLoadEvolved = "{\"type\": \"record\",\"namespace\": \"com.mycorp.schemaLoad\",\"name\": \"value_reference\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
+var schemaReferencerSchemaLoad = "{\"type\": \"record\",\"namespace\": \"com.mycorp.schemaLoad\",\"name\": \"value_referencing\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"com.mycorp.schemaLoad.value_reference\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
+var schemaToReference = "{\"type\":\"record\",\"name\":\"reference\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"},{\"name\":\"someField2\",\"type\":\"int\"}]}"
+var schemaToReferenceFinal = "{\"type\":\"record\",\"name\":\"referenceWithDepth\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"}]}"
+var schemaReferencing = "{\"type\":\"record\",\"name\":\"sampleRecordreferencing\",\"namespace\":\"com.mycorp.somethinghere\",\"fields\":[{\"name\":\"reference\",\"type\":\"com.reference.reference\"}]}"
+
 /*
 	General Integration Testing Framework for the ccloud-schema-exporter.
 	To register more schemas for testing, add to setupSource() and make sure to use registerAtSource to register the
@@ -58,6 +72,14 @@ func setup() {
 
 func tearDown() {
 	composeEnv.WithCommand([]string{"down", "-v"}).Invoke()
+}
+
+func TestSchemaLoad(t *testing.T) {
+	log.Println("Testing Schema Load: AVRO!")
+
+	testClientDst.SetMode(client.READWRITE)
+
+	testSchemaLoadAvro(t, 9)
 }
 
 func TestExportMode(t *testing.T) {
@@ -262,23 +284,6 @@ func setupSource() {
 	id := int64(100500)
 	versions := []int64{1, 2, 3}
 
-	schema := "{\"type\": \"record\",\"namespace\": \"com.mycorp.mynamespace\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"},{\"name\": \"too\",\"type\": \"string\",\"doc\": \"The string is a unicode character sequence.\"}]}"
-
-	schema2 := "{\"type\": \"record\",\"namespace\": \"com.mycorp.mynamespace\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"}]}"
-
-	schema3 := "{\"type\": \"record\",\"namespace\": \"com.mycorp.mynamespace\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
-
-	schema4 := "{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"},{\"name\": \"too\",\"type\": \"string\",\"doc\": \"The string is a unicode character sequence.\"}]}"
-
-	schema5 := "{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"},{\"name\": \"that\",\"type\": \"double\",\"doc\": \"The double type is a double precision (64-bit) IEEE 754 floating-point number.\"}]}"
-
-	schema6 := "{\"type\": \"record\",\"namespace\": \"com.mycorp.wassup\",\"name\": \"value_newnew\",\"doc\": \"Sample schema to help you get started.\",\"fields\": [{\"name\": \"this\",\"type\":\"int\",\"doc\": \"The int type is a 32-bit signed integer.\"}]}"
-
-	schemaToReferenceFinal := "{\"type\":\"record\",\"name\":\"referenceWithDepth\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"}]}"
-
-	schemaToReference := "{\"type\":\"record\",\"name\":\"reference\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"com.reference.referenceWithDepth\"}]}"
-
-	schemaReferencing := "{\"type\":\"record\",\"name\":\"sampleRecordreferencing\",\"namespace\":\"com.mycorp.somethinghere\",\"fields\":[{\"name\":\"reference\",\"type\":\"com.reference.reference\"}]}"
 	schemas := []string{schema, schema2, schema3, schema4, schema5, schema6}
 	counter := 1
 
@@ -495,6 +500,54 @@ func testLocalCopy(t *testing.T, expectedFilesToWrite int) {
 	assert.Equal(t, expectedFilesToWrite, count)
 	assert.Equal(t, expectedFilesToWrite, len(files2))
 
+}
+
+func testSchemaLoadAvro(t *testing.T, expectedLoadNumber int) {
+
+	currentPath, _ := os.Getwd()
+	currentPath = filepath.Clean(currentPath)
+	testClientDst.DeleteAllSubjectsPermanently()
+
+	// Test Relative Paths
+	err := os.Mkdir(currentPath+localRelativePath, 0755)
+	if err != nil {
+		panic(err)
+	}
+
+	// Write files for Schema Load testing
+	client.WriteFile(currentPath+localRelativePath, "someSchemaLoad1", schemaReferencerSchemaLoad)
+	client.WriteFile(currentPath+localRelativePath, "someSchemaLoad2", schemaReferenceForSchemaLoad)
+	client.WriteFile(currentPath+localRelativePath, "someSchemaLoad3", schemaReferenceForSchemaLoadEvolved)
+	client.WriteFile(currentPath+localRelativePath, "someSchemaLoad4", schema)
+	client.WriteFile(currentPath+localRelativePath, "someSchemaLoad5", schema2)
+	client.WriteFile(currentPath+localRelativePath, "someSchemaLoad6", schema3)
+	client.WriteFile(currentPath+localRelativePath, "someSchemaLoad7", schema4)
+	client.WriteFile(currentPath+localRelativePath, "someSchemaLoad8", schema5)
+	client.WriteFile(currentPath+localRelativePath, "someSchemaLoad9", schema6)
+	defer os.RemoveAll(currentPath + localRelativePath)
+
+	avroLoader := client.NewSchemaLoader(client.AVRO.String(), testClientDst, "testingLocalBackupRelativePath", currentPath)
+	avroLoader.Run()
+
+	dstSubj := client.GetCurrentSubjectState(testClientDst)
+
+	count := 0
+	// Get total schema count
+	for _, versions := range dstSubj {
+		for _, _ = range versions {
+			count = count + 1
+		}
+	}
+
+	ReferencingSchemaReferences := testClientDst.GetSchema("com.mycorp.schemaLoad.value_referencing-value", 1, false).References
+	versionOfReferencedSchema := ReferencingSchemaReferences[0].Version
+
+	testClientDst.DeleteAllSubjectsPermanently()
+	numOfFilesWritten, _ := ioutil.ReadDir(currentPath + localRelativePath)
+
+	assert.Equal(t, expectedLoadNumber, count)
+	assert.Equal(t, expectedLoadNumber, len(numOfFilesWritten))
+	assert.Equal(t, int64(2), versionOfReferencedSchema)
 }
 
 func commonSyncTest(t *testing.T, lenOfDestSubjects int) {
