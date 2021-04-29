@@ -289,7 +289,27 @@ Schema Loads support schema versioning. All versions of a schema will be registe
 according to the lexicographical order of the files (for example, a file named `orders_v1` will be registered before `orders_v2`).
 References are also versioned; However, only the latest version of reference will be referenced by other schemas.
 
-This feature supports allow and disallow lists.
+Schema References in AVRO are supported in the following format (in-line references are supported by default already):
+
+[source,json]
+----
+{
+   "type" : "record",
+   "namespace" : "io.leal.abraham",
+   "name" : "myRecord",
+   "fields" : [
+      { "name" : "Name" , "type" : ["null", "io.leal.abraham.anotherReference"], "default": null },
+      { "name" : "Age" , "type" : "io.leal.abraham.singleReference" }
+   ]
+}
+----
+
+Where `io.leal.abraham.anotherReference` and `io.leal.abraham.singleReference` are both the full names
+to referenced records that also live within the path being transversed. `ccloud-schema-exporter` will ensure
+those references are registered first to Schema Registry and are correctly set in the ultimate
+registration of the referencing schema.
+
+This feature also supports allow and disallow lists.
 
 === Monitoring
 
