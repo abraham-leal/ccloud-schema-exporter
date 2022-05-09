@@ -282,9 +282,25 @@ func (src *SchemaRegistryClient) GetSchema(subject string, version int64, delete
 
 	err = json.Unmarshal(body, &schemaResponse)
 	checkDontFail(err)
+	
+	//update doc field with SR subject name
+	subjectName := schemaResponse.Subject
 
-	return SchemaRecord{Subject: schemaResponse.Subject, Schema: schemaResponse.Schema, Version: schemaResponse.Version, Id: schemaResponse.Id, SType: schemaResponse.SType, References: schemaResponse.References}.setTypeIfEmpty().setReferenceIfEmpty()
+	// Adding the new field to the schemas after importing and before exporting
+	var unmarshalledSchema map[string]interface{}
+	json.Unmarshal([]byte(schemaResponse.Schema), &unmarshalledSchema)
+	key, exists := unmarshalledSchema["doc"]
+
+	if exists {
+		value := key.(string)
+		unmarshalledSchema["doc"] = subjectName + " - " + value
+	} else {
+		unmarshalledSchema["doc"] = subjectName
+	}
+	newData, err := json.Marshal(unmarshalledSchema)
+	return SchemaRecord{Subject: schemaResponse.Subject, Schema: string(newData), Version: schemaResponse.Version, Id: schemaResponse.Id, SType: schemaResponse.SType, References: schemaResponse.References}.setTypeIfEmpty().setReferenceIfEmpty()
 }
+
 
 // Registers a schema
 func (src *SchemaRegistryClient) RegisterSchema(schema string, subject string, SType string, references []SchemaReference) []byte {
