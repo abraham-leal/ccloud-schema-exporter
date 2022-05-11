@@ -40,8 +40,13 @@ func GetFlags() {
 	syncDeletesFlag := flag.Bool("syncDeletes", false, "Setting this will sync soft deletes from the source cluster to the destination")
 	syncHardDeletesFlag := flag.Bool("syncHardDeletes", false, "Setting this will sync hard deletes from the source cluster to the destination")
 	noPromptFlag := flag.Bool("noPrompt", false, "Set this flag to avoid checks while running. Assure you have the destination SR to correct Mode and Compatibility.")
+	addDocFieldFlag := flag.Bool("addDocField", false, "Add a doc field to the schemas before exporting to Destination SR")
 
 	flag.Parse()
+	
+	if *addDocFieldFlag {
+		log.Printf("addDocField Flag applied")
+	}
 
 	if *noPromptFlag {
 		NoPrompt = true
