@@ -6,9 +6,10 @@ package client
 //
 
 import (
+	"net/http"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"net/http"
 )
 
 var HttpCallTimeout int
@@ -22,6 +23,7 @@ var SrcSRSecret string
 var DestSRUrl string
 var DestSRKey string
 var DestSRSecret string
+var DestSRContext string
 var CustomDestinationName string
 var CustomSourceName string
 var NoPrompt bool

@@ -20,6 +20,7 @@ func GetFlags() {
 	flag.StringVar(&DestSRUrl, "dest-sr-url", "", "Url to the Destination Schema Registry Cluster")
 	flag.StringVar(&DestSRKey, "dest-sr-key", "", "API KEY for the Destination Schema Registry Cluster")
 	flag.StringVar(&DestSRSecret, "dest-sr-secret", "", "API SECRET for the Destination Schema Registry Cluster")
+	flag.StringVar(&DestSRContext, "dest-sr-context", "", "Context to apply schemas to for the Destination Schema Registry Cluster")
 	flag.StringVar(&CustomDestinationName, "customDestination", "", "Name of the implementation to be used as a destination (same as mapping)")
 	flag.StringVar(&CustomSourceName, "customSource", "", "Name of the implementation to be used as a source (same as mapping)")
 	flag.StringVar(&SchemaLoadType, "schemaLoad", "", "Schema Type for the load. Currently supported: AVRO")

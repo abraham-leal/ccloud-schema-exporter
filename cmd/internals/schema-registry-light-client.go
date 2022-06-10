@@ -33,7 +33,7 @@ func NewSchemaRegistryClient(SR string, apiKey string, apiSecret string, target 
 	// If the parameters are empty, go fetch from env
 	if SR == "" || apiKey == "" || apiSecret == "" {
 		if target == "dst" {
-			client = SchemaRegistryClient{SRUrl: DestGetSRUrl(), SRApiKey: DestGetAPIKey(), SRApiSecret: DestGetAPISecret()}
+			client = SchemaRegistryClient{SRUrl: DestGetSRUrl(), SRApiKey: DestGetAPIKey(), SRApiSecret: DestGetAPISecret(), SRContext: DestGetSRContext()}
 		}
 		if target == "src" {
 			client = SchemaRegistryClient{SRUrl: SrcGetSRUrl(), SRApiKey: SrcGetAPIKey(), SRApiSecret: SrcGetAPISecret()}
@@ -226,7 +226,9 @@ func (src *SchemaRegistryClient) IsImportModeReady() bool {
 
 // Allows to set a global mode for the backing Schema Registry
 func (src *SchemaRegistryClient) SetMode(modeToSet Mode) bool {
-	endpoint := fmt.Sprintf("%s/mode", src.SRUrl)
+	endpoint := fmt.Sprintf("%s/contexts/.%s/mode", src.SRUrl, src.SRContext)
+
+	log.Printf(endpoint)
 
 	mode := ModeRecord{Mode: modeToSet.String()}
 	modeToSend, err := json.Marshal(mode)
@@ -293,7 +295,7 @@ func (src *SchemaRegistryClient) RegisterSchema(schema string, subject string, S
 
 // Registers a schema with the given SchemaID and SchemaVersion
 func (src *SchemaRegistryClient) RegisterSchemaBySubjectAndIDAndVersion(schema string, subject string, id int64, version int64, SType string, references []SchemaReference) []byte {
-	endpoint := fmt.Sprintf("%s/subjects/%s/versions", src.SRUrl, url.QueryEscape(subject))
+	endpoint := fmt.Sprintf("%s/contexts/.%s/subjects/%s/versions", src.SRUrl, src.SRContext, url.QueryEscape(subject))
 
 	schemaRequest := SchemaToRegister{}
 	if id == 0 && version == 0 {

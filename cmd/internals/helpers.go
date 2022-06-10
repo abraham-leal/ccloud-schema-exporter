@@ -245,7 +245,7 @@ func filterIDs(candidate map[int64]map[string][]int64) map[int64]map[string][]in
 // Generic handling of queries to the SR instance. Returns back the response as a map of string:string
 // Not suitable for endpoint queries that do not conform to this structure
 func handleEndpointQuery(end string, src *SchemaRegistryClient) (map[string]string, bool) {
-	endpoint := fmt.Sprintf("%s/%s", src.SRUrl, end)
+	endpoint := fmt.Sprintf("%s/contexts/.%s/%s", src.SRUrl, src.SRContext, end)
 	req := GetNewRequest("GET", endpoint, src.SRApiKey, src.SRApiSecret, nil, nil)
 
 	res, err := httpClient.Do(req)

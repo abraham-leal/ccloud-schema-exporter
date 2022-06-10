@@ -18,6 +18,7 @@ type SchemaRegistryClient struct {
 	SRUrl       string
 	SRApiKey    string
 	SRApiSecret string
+	SRContext   string
 }
 
 /*

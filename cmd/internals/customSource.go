@@ -164,13 +164,12 @@ func RunCustomSourceBatch(dstClient *SchemaRegistryClient, customSrc CustomSourc
 	}
 }
 
-
 // Registers the schema references given in the SchemaRecord, recursively, for a custom source
 func RegisterReferencesWithCustomSource(wrappingSchema SchemaRecord, customSrc CustomSource, destClient *SchemaRegistryClient) {
 	if len(wrappingSchema.References) != 0 {
 		log.Printf("Registering references for subject %s and version %d", wrappingSchema.Subject, wrappingSchema.Version)
 		for _, schemaReference := range wrappingSchema.References {
-			schemaId, schemaType, schemaString, schemaReferencesWithin, err:= customSrc.GetSchema(schemaReference.Subject, schemaReference.Version)
+			schemaId, schemaType, schemaString, schemaReferencesWithin, err := customSrc.GetSchema(schemaReference.Subject, schemaReference.Version)
 			if err != nil {
 				log.Println("Could not retrieve schema from custom source")
 			}
@@ -240,11 +239,11 @@ func NewInMemRegistry(records []SchemaRecord) inMemRegistry {
 	state := map[int64]SchemaRecord{}
 	for _, record := range records {
 		state[record.Id] = SchemaRecord{
-			Subject: record.Subject,
-			Schema:  record.Schema,
-			SType:   record.SType,
-			Version: record.Version,
-			Id:      record.Id,
+			Subject:    record.Subject,
+			Schema:     record.Schema,
+			SType:      record.SType,
+			Version:    record.Version,
+			Id:         record.Id,
 			References: record.References,
 		}
 	}
@@ -305,10 +304,16 @@ type SchemaApicurioMeta struct {
 }
 
 type ApicurioSource struct {
-	Options       map[string]string
-	apiCurioUrl   string
-	referenceName map[string]string
+	Options        map[string]string
+	apiCurioUrl    string
+	namingStrategy string
+	referenceName  map[string]string
 }
+
+const (
+	IdNamingStrategy   = "id"
+	NameNamingStrategy = "name"
+)
 
 func (ap *ApicurioSource) SetUp() error {
 	url, exists := ap.Options["apicurioUrl"]
@@ -317,6 +322,15 @@ func (ap *ApicurioSource) SetUp() error {
 		delete(ap.Options, "apicurioUrl")
 	} else {
 		log.Println("Options not provided, using local apicurio connection at: http://localhost:8081")
+	}
+
+	ns, exists := ap.Options["namingStrategy"]
+	if exists {
+		ap.namingStrategy = ns
+		delete(ap.Options, "namingStrategy")
+	} else {
+		ap.namingStrategy = NameNamingStrategy
+		log.Println("Options not provided, using local Name based naming strategy")
 	}
 	return nil
 }
@@ -420,11 +434,21 @@ func (ap *ApicurioSource) GetSourceState() (map[string][]int64, error) {
 				metaResponseContainer.Stype == "PROTOBUF" {
 				artifactVersions, haveSeenBefore := sourceState[artifactID]
 				if !haveSeenBefore {
-					sourceState[metaResponseContainer.Name] = []int64{metaResponseContainer.Version}
-					ap.referenceName[metaResponseContainer.Name] = artifactID
+					if ap.namingStrategy == NameNamingStrategy {
+						sourceState[metaResponseContainer.Name] = []int64{metaResponseContainer.Version}
+						ap.referenceName[metaResponseContainer.Name] = artifactID
+					} else if ap.namingStrategy == IdNamingStrategy {
+						sourceState[metaResponseContainer.Id] = []int64{metaResponseContainer.Version}
+						ap.referenceName[metaResponseContainer.Id] = artifactID
+					}
+
 				} else {
 					artifactVersions := append(artifactVersions, metaResponseContainer.Version)
-					sourceState[metaResponseContainer.Name] = artifactVersions
+					if ap.namingStrategy == NameNamingStrategy {
+						sourceState[metaResponseContainer.Name] = artifactVersions
+					} else if ap.namingStrategy == IdNamingStrategy {
+						sourceState[metaResponseContainer.Id] = artifactVersions
+					}
 					log.Println(sourceState)
 				}
 			}
