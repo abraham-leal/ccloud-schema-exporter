@@ -8,6 +8,7 @@ package integration
 import (
 	"context"
 	client "github.com/abraham-leal/ccloud-schema-exporter/cmd/internals"
+	testingUtils "github.com/abraham-leal/ccloud-schema-exporter/cmd/testingUtils"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -20,7 +21,6 @@ import (
 	"time"
 )
 
-var composeEnv *testcontainers.LocalDockerCompose
 var testClientSrc *client.SchemaRegistryClient
 var testClientDst *client.SchemaRegistryClient
 var cpTestVersion = "7.1.1"
@@ -47,10 +47,10 @@ var schemaReferencerSchemaLoad = "{\"type\": \"record\",\"namespace\": \"com.myc
 var schemaToReference = "{\"type\":\"record\",\"name\":\"reference\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"},{\"name\":\"someField2\",\"type\":\"int\"}]}"
 var schemaToReferenceFinal = "{\"type\":\"record\",\"name\":\"referenceWithDepth\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"}]}"
 var schemaReferencing = "{\"type\":\"record\",\"name\":\"sampleRecordreferencing\",\"namespace\":\"com.mycorp.somethinghere\",\"fields\":[{\"name\":\"reference\",\"type\":\"com.reference.reference\"}]}"
-var zookeeperContainer testcontainers.Container
-var kafkaContainer testcontainers.Container
-var schemaRegistrySrcContainer testcontainers.Container
-var schemaRegistryDstContainer testcontainers.Container
+var localZookeeperContainer testcontainers.Container
+var localKafkaContainer testcontainers.Container
+var localSchemaRegistrySrcContainer testcontainers.Container
+var localSchemaRegistryDstContainer testcontainers.Container
 var ctx = context.Background()
 
 /*
@@ -68,131 +68,54 @@ func TestMain(m *testing.M) {
 
 func setup() {
 
-	var network = testcontainers.NetworkRequest{
-		Name:   "integration-test-network",
-		Driver: "bridge",
-	}
+	localZookeeperContainer, localKafkaContainer, localSchemaRegistrySrcContainer = testingUtils.GetBaseInfra("integration")
 
-	provider, err := testcontainers.NewDockerProvider()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if _, err := provider.GetNetwork(ctx, network); err != nil {
-		if _, err := provider.CreateNetwork(ctx, network); err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	networkNames := []string{"integration-test-network"}
-
-	zookeeperContainer, err = testcontainers.GenericContainer(ctx,
-		testcontainers.GenericContainerRequest{
-			ContainerRequest: testcontainers.ContainerRequest{
-				Image:        "confluentinc/cp-zookeeper:" + cpTestVersion,
-				ExposedPorts: []string{"2181/tcp"},
-				WaitingFor:   wait.ForListeningPort("2181/tcp"),
-				Name:         "zookeeper",
-				Env: map[string]string{
-					"ZOOKEEPER_CLIENT_PORT": "2181",
-					"ZOOKEEPER_TICK_TIME":   "2000",
-				},
-				Networks: networkNames,
-			},
-			Started: true,
-		})
-	checkFail(err, "Zookeeper was not able to start")
-
-	kafkaContainer, err = testcontainers.GenericContainer(ctx,
-		testcontainers.GenericContainerRequest{
-			ContainerRequest: testcontainers.ContainerRequest{
-				Image:        "confluentinc/cp-server:" + cpTestVersion,
-				ExposedPorts: []string{"29092/tcp"},
-				WaitingFor:   wait.ForListeningPort("29092/tcp"),
-				Name:         "broker",
-				Env: map[string]string{
-					"KAFKA_BROKER_ID":                                   "1",
-					"KAFKA_ZOOKEEPER_CONNECT":                           "zookeeper:2181",
-					"KAFKA_LISTENER_SECURITY_PROTOCOL_MAP":              "PLAINTEXT:PLAINTEXT",
-					"KAFKA_ADVERTISED_LISTENERS":                        "PLAINTEXT://broker:29092",
-					"KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR":            "1",
-					"KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS":            "0",
-					"KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR":  "1",
-					"KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR": "1",
-					"KAFKA_TRANSACTION_STATE_LOG_MIN_ISR":               "1",
-					"KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR":    "1",
-				},
-				Networks: networkNames,
-			},
-			Started: true,
-		})
-
-	schemaRegistrySrcContainer, err = testcontainers.GenericContainer(ctx,
+	localSchemaRegistryDstContainer, err := testcontainers.GenericContainer(ctx,
 		testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
 				Image:        "confluentinc/cp-schema-registry:" + cpTestVersion,
 				ExposedPorts: []string{"8081/tcp"},
 				WaitingFor:   wait.ForListeningPort("8081/tcp"),
-				Name:         "schema-registry-src",
-				Env: map[string]string{
-					"SCHEMA_REGISTRY_HOST_NAME":                           "schema-registry-src",
-					"SCHEMA_REGISTRY_SCHEMA_REGISTRY_GROUP_ID":            "schema-src",
-					"SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS":        "broker:29092",
-					"SCHEMA_REGISTRY_KAFKASTORE_TOPIC":                    "_schemas",
-					"SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR": "1",
-					"SCHEMA_REGISTRY_MODE_MUTABILITY":                     "true",
-				},
-				Networks: networkNames,
-			},
-			Started: true,
-		})
-	checkFail(err, "Src SR was not able to start")
-
-	schemaRegistryDstContainer, err = testcontainers.GenericContainer(ctx,
-		testcontainers.GenericContainerRequest{
-			ContainerRequest: testcontainers.ContainerRequest{
-				Image:        "confluentinc/cp-schema-registry:" + cpTestVersion,
-				ExposedPorts: []string{"8082/tcp"},
-				WaitingFor:   wait.ForListeningPort("8082/tcp"),
-				Name:         "schema-registry-dst",
+				Name:         "schema-registry-src-clients",
 				Env: map[string]string{
 					"SCHEMA_REGISTRY_HOST_NAME":                           "schema-registry-dst",
 					"SCHEMA_REGISTRY_SCHEMA_REGISTRY_GROUP_ID":            "schema-dst",
-					"SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS":        "broker:29092",
+					"SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS":        "brokerintegration:29092",
 					"SCHEMA_REGISTRY_KAFKASTORE_TOPIC":                    "_schemas-dst",
 					"SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR": "1",
 					"SCHEMA_REGISTRY_MODE_MUTABILITY":                     "true",
 					"SCHEMA_REGISTRY_LISTENERS":                           "http://0.0.0.0:8082",
 				},
-				Networks: networkNames,
+				Networks: []string{"integration"},
 			},
 			Started: true,
 		})
+	testingUtils.CheckFail(err, "Source SR was not able to start")
 
-	checkFail(err, "Dst SR was not able to start")
+	testingUtils.CheckFail(err, "Dst SR was not able to start")
 
 	client.ScrapeInterval = 2
 	client.SyncDeletes = true
 	client.HttpCallTimeout = 60
 
-	srcSRPort, err := schemaRegistrySrcContainer.MappedPort(ctx, "8081")
-	checkFail(err, "Not Able to get SRC SR Port")
-	dstSRPort, err := schemaRegistryDstContainer.MappedPort(ctx, "8082")
-	checkFail(err, "Not Able to get DST SR Port")
+	srcSRPort, err := localSchemaRegistrySrcContainer.MappedPort(ctx, "8081")
+	testingUtils.CheckFail(err, "Not Able to get SRC SR Port")
+	dstSRPort, err := localSchemaRegistryDstContainer.MappedPort(ctx, "8082")
+	testingUtils.CheckFail(err, "Not Able to get DST SR Port")
 
 	testClientSrc = client.NewSchemaRegistryClient("http://localhost:"+srcSRPort.Port(), "testUser", "testPass", "src")
 	testClientDst = client.NewSchemaRegistryClient("http://localhost:"+dstSRPort.Port(), "testUser", "testPass", "dst")
 }
 
 func tearDown() {
-	err := schemaRegistrySrcContainer.Terminate(ctx)
-	checkFail(err, "Could not terminate source sr")
-	err = schemaRegistryDstContainer.Terminate(ctx)
-	checkFail(err, "Could not terminate destination sr")
-	err = kafkaContainer.Terminate(ctx)
-	checkFail(err, "Could not terminate kafka")
-	err = zookeeperContainer.Terminate(ctx)
-	checkFail(err, "Could not terminate zookeeper")
+	err := localSchemaRegistrySrcContainer.Terminate(ctx)
+	testingUtils.CheckFail(err, "Could not terminate source sr")
+	err = localSchemaRegistryDstContainer.Terminate(ctx)
+	testingUtils.CheckFail(err, "Could not terminate destination sr")
+	err = localKafkaContainer.Terminate(ctx)
+	testingUtils.CheckFail(err, "Could not terminate kafka")
+	err = localZookeeperContainer.Terminate(ctx)
+	testingUtils.CheckFail(err, "Could not terminate zookeeper")
 }
 
 func TestSchemaLoad(t *testing.T) {
@@ -682,11 +605,4 @@ func commonSyncTest(t *testing.T, lenOfDestSubjects int) {
 	testSoftDelete(t, lenOfDestSubjects)
 	time.Sleep(time.Duration(10) * time.Second) // Give time for sync
 
-}
-
-func checkFail(e error, msg string) {
-	if e != nil {
-		log.Println(e)
-		log.Fatalln(msg)
-	}
 }
