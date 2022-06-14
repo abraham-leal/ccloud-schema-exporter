@@ -70,6 +70,8 @@ func setup() {
 		}
 	}
 
+	networkNames := []string{"client-test-network"}
+
 	zookeeperContainer, err = testcontainers.GenericContainer(ctx,
 		testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
@@ -81,8 +83,7 @@ func setup() {
 					"ZOOKEEPER_CLIENT_PORT": "2181",
 					"ZOOKEEPER_TICK_TIME":   "2000",
 				},
-				ImagePlatform: "linux/amd64",
-				Networks:      []string{"client-test-network"},
+				Networks: networkNames,
 			},
 			Started: true,
 		})
@@ -107,8 +108,7 @@ func setup() {
 					"KAFKA_TRANSACTION_STATE_LOG_MIN_ISR":               "1",
 					"KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR":    "1",
 				},
-				ImagePlatform: "linux/amd64",
-				Networks:      []string{"client-test-network"},
+				Networks: networkNames,
 			},
 			Started: true,
 		})
@@ -128,8 +128,7 @@ func setup() {
 					"SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR": "1",
 					"SCHEMA_REGISTRY_MODE_MUTABILITY":                     "true",
 				},
-				ImagePlatform: "linux/amd64",
-				Networks:      []string{"client-test-network"},
+				Networks: networkNames,
 			},
 			Started: true,
 		})
