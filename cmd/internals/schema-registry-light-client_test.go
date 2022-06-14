@@ -6,16 +6,17 @@ package client
 //
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"sync"
 	"testing"
-	"time"
 )
 
 var composeEnv *testcontainers.LocalDockerCompose
@@ -24,6 +25,11 @@ var mockSchema = "{\"type\":\"record\",\"name\":\"value_newnew\",\"namespace\":\
 var testingSubject = "test-key"
 var newSubject = "newSubject-key"
 var SRUrl = "http://localhost:8081"
+var zookeeperContainer testcontainers.Container
+var kafkaContainer testcontainers.Container
+var schemaRegistrySrcContainer testcontainers.Container
+var ctx = context.Background()
+var cpTestVersion = "7.1.1"
 
 func TestMainStack(t *testing.T) {
 	setup()
@@ -47,9 +53,91 @@ func TestMainStack(t *testing.T) {
 }
 
 func setup() {
-	composeEnv = testcontainers.NewLocalDockerCompose([]string{"../integrationTests/docker-compose-internal.yml"}, "internals")
-	composeEnv.WithCommand([]string{"up", "-d"}).Invoke()
-	time.Sleep(time.Duration(30) * time.Second) // give services time to set up
+
+	var network = testcontainers.NetworkRequest{
+		Name:   "client-test-network",
+		Driver: "bridge",
+	}
+
+	provider, err := testcontainers.NewDockerProvider()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if _, err := provider.GetNetwork(ctx, network); err != nil {
+		if _, err := provider.CreateNetwork(ctx, network); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	zookeeperContainer, err = testcontainers.GenericContainer(ctx,
+		testcontainers.GenericContainerRequest{
+			ContainerRequest: testcontainers.ContainerRequest{
+				Image:        "confluentinc/cp-zookeeper:" + cpTestVersion,
+				ExposedPorts: []string{"2181/tcp"},
+				WaitingFor:   wait.ForListeningPort("2181/tcp"),
+				Name:         "zookeeperclients",
+				Env: map[string]string{
+					"ZOOKEEPER_CLIENT_PORT": "2181",
+					"ZOOKEEPER_TICK_TIME":   "2000",
+				},
+				ImagePlatform: "linux/amd64",
+				Networks:      []string{"client-test-network"},
+			},
+			Started: true,
+		})
+	checkFail(err, "Zookeeper was not able to start")
+
+	kafkaContainer, err = testcontainers.GenericContainer(ctx,
+		testcontainers.GenericContainerRequest{
+			ContainerRequest: testcontainers.ContainerRequest{
+				Image:        "confluentinc/cp-server:" + cpTestVersion,
+				ExposedPorts: []string{"29092/tcp"},
+				WaitingFor:   wait.ForListeningPort("29092/tcp"),
+				Name:         "brokerclients",
+				Env: map[string]string{
+					"KAFKA_BROKER_ID":                                   "1",
+					"KAFKA_ZOOKEEPER_CONNECT":                           "zookeeperclients:2181",
+					"KAFKA_LISTENER_SECURITY_PROTOCOL_MAP":              "PLAINTEXT:PLAINTEXT",
+					"KAFKA_ADVERTISED_LISTENERS":                        "PLAINTEXT://brokerclients:29092",
+					"KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR":            "1",
+					"KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS":            "0",
+					"KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR":  "1",
+					"KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR": "1",
+					"KAFKA_TRANSACTION_STATE_LOG_MIN_ISR":               "1",
+					"KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR":    "1",
+				},
+				ImagePlatform: "linux/amd64",
+				Networks:      []string{"client-test-network"},
+			},
+			Started: true,
+		})
+
+	schemaRegistrySrcContainer, err = testcontainers.GenericContainer(ctx,
+		testcontainers.GenericContainerRequest{
+			ContainerRequest: testcontainers.ContainerRequest{
+				Image:        "confluentinc/cp-schema-registry:" + cpTestVersion,
+				ExposedPorts: []string{"8081/tcp"},
+				WaitingFor:   wait.ForListeningPort("8081/tcp"),
+				Name:         "schema-registry-src-clients",
+				Env: map[string]string{
+					"SCHEMA_REGISTRY_HOST_NAME":                           "schema-registry-src",
+					"SCHEMA_REGISTRY_SCHEMA_REGISTRY_GROUP_ID":            "schema-src",
+					"SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS":        "brokerclients:29092",
+					"SCHEMA_REGISTRY_KAFKASTORE_TOPIC":                    "_schemas",
+					"SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR": "1",
+					"SCHEMA_REGISTRY_MODE_MUTABILITY":                     "true",
+				},
+				ImagePlatform: "linux/amd64",
+				Networks:      []string{"client-test-network"},
+			},
+			Started: true,
+		})
+
+	srcSRPort, err := schemaRegistrySrcContainer.MappedPort(ctx, "8081")
+	checkFail(err, "Not Able to get SRC SR Port")
+
+	SRUrl = "http://localhost:" + srcSRPort.Port()
 
 	testClient = NewSchemaRegistryClient(SRUrl, "testUser", "testPass", "src")
 
@@ -58,8 +146,12 @@ func setup() {
 }
 
 func tearDown() {
-	composeEnv.WithCommand([]string{"down", "-v"}).Invoke()
-	time.Sleep(time.Duration(10) * time.Second) // give services time to set up
+	err := schemaRegistrySrcContainer.Terminate(ctx)
+	checkFail(err, "Could not terminate source sr")
+	err = kafkaContainer.Terminate(ctx)
+	checkFail(err, "Could not terminate kafka")
+	err = zookeeperContainer.Terminate(ctx)
+	checkFail(err, "Could not terminate zookeeper")
 }
 
 func TIsReachable(t *testing.T) {
