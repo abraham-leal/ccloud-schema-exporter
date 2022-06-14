@@ -164,13 +164,12 @@ func RunCustomSourceBatch(dstClient *SchemaRegistryClient, customSrc CustomSourc
 	}
 }
 
-
 // Registers the schema references given in the SchemaRecord, recursively, for a custom source
 func RegisterReferencesWithCustomSource(wrappingSchema SchemaRecord, customSrc CustomSource, destClient *SchemaRegistryClient) {
 	if len(wrappingSchema.References) != 0 {
 		log.Printf("Registering references for subject %s and version %d", wrappingSchema.Subject, wrappingSchema.Version)
 		for _, schemaReference := range wrappingSchema.References {
-			schemaId, schemaType, schemaString, schemaReferencesWithin, err:= customSrc.GetSchema(schemaReference.Subject, schemaReference.Version)
+			schemaId, schemaType, schemaString, schemaReferencesWithin, err := customSrc.GetSchema(schemaReference.Subject, schemaReference.Version)
 			if err != nil {
 				log.Println("Could not retrieve schema from custom source")
 			}
@@ -240,11 +239,11 @@ func NewInMemRegistry(records []SchemaRecord) inMemRegistry {
 	state := map[int64]SchemaRecord{}
 	for _, record := range records {
 		state[record.Id] = SchemaRecord{
-			Subject: record.Subject,
-			Schema:  record.Schema,
-			SType:   record.SType,
-			Version: record.Version,
-			Id:      record.Id,
+			Subject:    record.Subject,
+			Schema:     record.Schema,
+			SType:      record.SType,
+			Version:    record.Version,
+			Id:         record.Id,
 			References: record.References,
 		}
 	}

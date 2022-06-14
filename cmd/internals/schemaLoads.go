@@ -117,7 +117,7 @@ func (sl *SchemaLoader) maybeRegisterAvroSchema(desc SchemaDescriptor, version i
 	check(err)
 	mapAsJsonString := string(mapAsJsonBytes)
 
-	thisSchemaSubject := thisSchemaName+"-value"
+	thisSchemaSubject := thisSchemaName + "-value"
 
 	if checkSubjectIsAllowed(thisSchemaName) && !sl.dstClient.schemaIsRegisteredUnderSubject(thisSchemaSubject,
 		"AVRO", mapAsJsonString, thisSchemaReferences) {
@@ -255,9 +255,9 @@ func (sl *SchemaLoader) resolveReferenceAndRegister(referenceName string, refere
 		sl.registerReferenceSet(versions, thisReferenceDescriptor)
 
 		thisReference := SchemaReference{
-			Name:    schemaFullName,              // The type referenced
+			Name:    schemaFullName,            // The type referenced
 			Subject: schemaFullName + "-value", // The SchemaDescriptor
-			Version: latestVersionForReference,   // Latest version of schema descriptor
+			Version: latestVersionForReference, // Latest version of schema descriptor
 		}
 
 		if !referenceIsInSlice(thisReference, *references) {

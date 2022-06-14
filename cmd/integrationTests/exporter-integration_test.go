@@ -67,8 +67,9 @@ func TestMain(m *testing.M) {
 }
 
 func setup() {
+	networkName := "integration"
 
-	localZookeeperContainer, localKafkaContainer, localSchemaRegistrySrcContainer = testingUtils.GetBaseInfra("integration")
+	localZookeeperContainer, localKafkaContainer, localSchemaRegistrySrcContainer = testingUtils.GetBaseInfra(networkName)
 
 	localSchemaRegistryDstContainer, err := testcontainers.GenericContainer(ctx,
 		testcontainers.GenericContainerRequest{
@@ -76,17 +77,17 @@ func setup() {
 				Image:        "confluentinc/cp-schema-registry:" + cpTestVersion,
 				ExposedPorts: []string{"8081/tcp"},
 				WaitingFor:   wait.ForListeningPort("8081/tcp"),
-				Name:         "schema-registry-src-clients",
+				Name:         "schema-registry-dst-" + networkName,
 				Env: map[string]string{
 					"SCHEMA_REGISTRY_HOST_NAME":                           "schema-registry-dst",
 					"SCHEMA_REGISTRY_SCHEMA_REGISTRY_GROUP_ID":            "schema-dst",
-					"SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS":        "brokerintegration:29092",
+					"SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS":        "broker" + networkName + ":29092",
 					"SCHEMA_REGISTRY_KAFKASTORE_TOPIC":                    "_schemas-dst",
 					"SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR": "1",
 					"SCHEMA_REGISTRY_MODE_MUTABILITY":                     "true",
 					"SCHEMA_REGISTRY_LISTENERS":                           "http://0.0.0.0:8082",
 				},
-				Networks: []string{"integration"},
+				Networks: []string{networkName},
 			},
 			Started: true,
 		})
