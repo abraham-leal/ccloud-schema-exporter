@@ -8,6 +8,7 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	testingUtils "github.com/abraham-leal/ccloud-schema-exporter/cmd/testingUtils"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
 	"io/ioutil"
@@ -15,15 +16,16 @@ import (
 	"net/http"
 	"sync"
 	"testing"
-	"time"
 )
 
-var composeEnv *testcontainers.LocalDockerCompose
 var testClient *SchemaRegistryClient
 var mockSchema = "{\"type\":\"record\",\"name\":\"value_newnew\",\"namespace\":\"com.mycorp.mynamespace\",\"doc\":\"Sample schema to help you get started.\",\"fields\":[{\"name\":\"this\",\"type\":\"int\",\"doc\":\"The int type is a 32-bit signed integer.\"},{\"name\":\"onefield\",\"type\":[\"null\",\"string\"],\"default\":null}]}"
 var testingSubject = "test-key"
 var newSubject = "newSubject-key"
 var SRUrl = "http://localhost:8081"
+var localZookeeperContainer testcontainers.Container
+var localKafkaContainer testcontainers.Container
+var localSchemaRegistrySrcContainer testcontainers.Container
 
 func TestMainStack(t *testing.T) {
 	setup()
@@ -47,9 +49,13 @@ func TestMainStack(t *testing.T) {
 }
 
 func setup() {
-	composeEnv = testcontainers.NewLocalDockerCompose([]string{"../integrationTests/docker-compose-internal.yml"}, "internals")
-	composeEnv.WithCommand([]string{"up", "-d"}).Invoke()
-	time.Sleep(time.Duration(30) * time.Second) // give services time to set up
+
+	localZookeeperContainer, localKafkaContainer, localSchemaRegistrySrcContainer = testingUtils.GetBaseInfra("clients")
+
+	srcSRPort, err := localSchemaRegistrySrcContainer.MappedPort(testingUtils.Ctx, "8081")
+	checkFail(err, "Not Able to get SRC SR Port")
+
+	SRUrl = "http://localhost:" + srcSRPort.Port()
 
 	testClient = NewSchemaRegistryClient(SRUrl, "testUser", "testPass", "src")
 
@@ -58,8 +64,12 @@ func setup() {
 }
 
 func tearDown() {
-	composeEnv.WithCommand([]string{"down", "-v"}).Invoke()
-	time.Sleep(time.Duration(10) * time.Second) // give services time to set up
+	err := localSchemaRegistrySrcContainer.Terminate(testingUtils.Ctx)
+	checkFail(err, "Could not terminate source sr")
+	err = localKafkaContainer.Terminate(testingUtils.Ctx)
+	checkFail(err, "Could not terminate kafka")
+	err = localZookeeperContainer.Terminate(testingUtils.Ctx)
+	checkFail(err, "Could not terminate zookeeper")
 }
 
 func TIsReachable(t *testing.T) {

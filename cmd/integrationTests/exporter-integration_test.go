@@ -6,9 +6,12 @@ package integration
 //
 
 import (
+	"context"
 	client "github.com/abraham-leal/ccloud-schema-exporter/cmd/internals"
+	testingUtils "github.com/abraham-leal/ccloud-schema-exporter/cmd/testingUtils"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
 	"io/ioutil"
 	"log"
 	"os"
@@ -18,9 +21,9 @@ import (
 	"time"
 )
 
-var composeEnv *testcontainers.LocalDockerCompose
 var testClientSrc *client.SchemaRegistryClient
 var testClientDst *client.SchemaRegistryClient
+var cpTestVersion = "7.1.1"
 var testingSubjectValue = "someSubject-value"
 var testingSubjectKey = "someSubject-key"
 var softDeleteLogMessage = "Testing soft delete sync"
@@ -44,12 +47,17 @@ var schemaReferencerSchemaLoad = "{\"type\": \"record\",\"namespace\": \"com.myc
 var schemaToReference = "{\"type\":\"record\",\"name\":\"reference\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"},{\"name\":\"someField2\",\"type\":\"int\"}]}"
 var schemaToReferenceFinal = "{\"type\":\"record\",\"name\":\"referenceWithDepth\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"}]}"
 var schemaReferencing = "{\"type\":\"record\",\"name\":\"sampleRecordreferencing\",\"namespace\":\"com.mycorp.somethinghere\",\"fields\":[{\"name\":\"reference\",\"type\":\"com.reference.reference\"}]}"
+var localZookeeperContainer testcontainers.Container
+var localKafkaContainer testcontainers.Container
+var localSchemaRegistrySrcContainer testcontainers.Container
+var localSchemaRegistryDstContainer testcontainers.Container
+var ctx = context.Background()
 
 /*
 	General Integration Testing Framework for the ccloud-schema-exporter.
 	To register more schemas for testing, add to setupSource() and make sure to use registerAtSource to register the
 	schema in the source Schema Registry.
- */
+*/
 
 func TestMain(m *testing.M) {
 	setup()
@@ -59,19 +67,54 @@ func TestMain(m *testing.M) {
 }
 
 func setup() {
-	composeEnv = testcontainers.NewLocalDockerCompose([]string{"docker-compose.yml"}, "integrationtests")
-	composeEnv.WithCommand([]string{"up", "-d"}).Invoke()
-	time.Sleep(time.Duration(18) * time.Second) // give services time to set up
+	networkName := "integration"
+
+	localZookeeperContainer, localKafkaContainer, localSchemaRegistrySrcContainer = testingUtils.GetBaseInfra(networkName)
+	err := error(nil)
+	localSchemaRegistryDstContainer, err = testcontainers.GenericContainer(ctx,
+		testcontainers.GenericContainerRequest{
+			ContainerRequest: testcontainers.ContainerRequest{
+				Image:        "confluentinc/cp-schema-registry:" + cpTestVersion,
+				ExposedPorts: []string{"8082/tcp"},
+				WaitingFor:   wait.ForListeningPort("8082/tcp"),
+				Name:         "schema-registry-dst-" + networkName,
+				Env: map[string]string{
+					"SCHEMA_REGISTRY_HOST_NAME":                           "schema-registry-dst",
+					"SCHEMA_REGISTRY_SCHEMA_REGISTRY_GROUP_ID":            "schema-dst",
+					"SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS":        "broker" + networkName + ":29092",
+					"SCHEMA_REGISTRY_KAFKASTORE_TOPIC":                    "_schemas-dst",
+					"SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR": "1",
+					"SCHEMA_REGISTRY_MODE_MUTABILITY":                     "true",
+					"SCHEMA_REGISTRY_LISTENERS":                           "http://0.0.0.0:8082",
+				},
+				Networks: []string{networkName},
+			},
+			Started: true,
+		})
+	testingUtils.CheckFail(err, "Dst SR was not able to start")
+
 	client.ScrapeInterval = 2
 	client.SyncDeletes = true
 	client.HttpCallTimeout = 60
 
-	testClientSrc = client.NewSchemaRegistryClient("http://localhost:8081", "testUser", "testPass", "src")
-	testClientDst = client.NewSchemaRegistryClient("http://localhost:8082", "testUser", "testPass", "dst")
+	srcSRPort, err := localSchemaRegistrySrcContainer.MappedPort(ctx, "8081")
+	testingUtils.CheckFail(err, "Not Able to get SRC SR Port")
+	dstSRPort, err := localSchemaRegistryDstContainer.MappedPort(ctx, "8082")
+	testingUtils.CheckFail(err, "Not Able to get DST SR Port")
+
+	testClientSrc = client.NewSchemaRegistryClient("http://localhost:"+srcSRPort.Port(), "testUser", "testPass", "src")
+	testClientDst = client.NewSchemaRegistryClient("http://localhost:"+dstSRPort.Port(), "testUser", "testPass", "dst")
 }
 
 func tearDown() {
-	composeEnv.WithCommand([]string{"down", "-v"}).Invoke()
+	err := localSchemaRegistrySrcContainer.Terminate(ctx)
+	testingUtils.CheckFail(err, "Could not terminate source sr")
+	err = localSchemaRegistryDstContainer.Terminate(ctx)
+	testingUtils.CheckFail(err, "Could not terminate destination sr")
+	err = localKafkaContainer.Terminate(ctx)
+	testingUtils.CheckFail(err, "Could not terminate kafka")
+	err = localZookeeperContainer.Terminate(ctx)
+	testingUtils.CheckFail(err, "Could not terminate zookeeper")
 }
 
 func TestSchemaLoad(t *testing.T) {

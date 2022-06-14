@@ -27,6 +27,14 @@ func check(e error) {
 	}
 }
 
+// Simple check function that will fail all if there is an error present and allows a custom message to be printed
+func checkFail(e error, msg string) {
+	if e != nil {
+		log.Println(e)
+		log.Fatalln(msg)
+	}
+}
+
 // Simple check function that will not fail and log if there is an error present
 func checkDontFail(e error) {
 	if e != nil {

@@ -26,13 +26,13 @@ var referenceDepthTwo = SchemaRecord{
 	Version:    1,
 	Id:         998,
 	References: nil,
-	}
+}
 
 var DTwoReference = SchemaReference{
 	Name:    "com.reference.referenceNextLevel",
 	Subject: "referenceNextLevel",
 	Version: 1,
-	}
+}
 
 var referenceDepthOne = SchemaRecord{
 	Subject:    "reference",
@@ -41,21 +41,21 @@ var referenceDepthOne = SchemaRecord{
 	Version:    1,
 	Id:         999,
 	References: []SchemaReference{DTwoReference},
-	}
+}
 var DOneReference = SchemaReference{
 	Name:    "com.reference.reference",
 	Subject: "reference",
 	Version: 1,
-	}
+}
 
 var schema1 = SchemaRecord{
-	Subject: testingSubject,
-	Schema:  schemaReferencing,
-	SType:   "AVRO",
-	Version: 1,
-	Id:      10001,
+	Subject:    testingSubject,
+	Schema:     schemaReferencing,
+	SType:      "AVRO",
+	Version:    1,
+	Id:         10001,
 	References: []SchemaReference{DOneReference},
-	}
+}
 
 func TestMainStackCustomSource(t *testing.T) {
 	setup()
@@ -108,7 +108,7 @@ func TCustomSourceSync(t *testing.T) {
 	time.Sleep(time.Duration(5) * time.Second) // Give time for sync
 
 	assert.Equal(t, 1, len(myTestCustomSource.inMemSchemas))
-	assert.Equal(t,len(myTestCustomSource.inMemSchemas), len(testClient.getSchemaList(false)))
+	assert.Equal(t, len(myTestCustomSource.inMemSchemas), len(testClient.getSchemaList(false)))
 
 	CancelRun = true
 	time.Sleep(time.Duration(3) * time.Second) // Give time for killing goroutine
