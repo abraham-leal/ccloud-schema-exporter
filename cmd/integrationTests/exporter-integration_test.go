@@ -75,8 +75,8 @@ func setup() {
 		testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
 				Image:        "confluentinc/cp-schema-registry:" + cpTestVersion,
-				ExposedPorts: []string{"8081/tcp"},
-				WaitingFor:   wait.ForListeningPort("8081/tcp"),
+				ExposedPorts: []string{"8082/tcp"},
+				WaitingFor:   wait.ForListeningPort("8082/tcp"),
 				Name:         "schema-registry-dst-" + networkName,
 				Env: map[string]string{
 					"SCHEMA_REGISTRY_HOST_NAME":                           "schema-registry-dst",
@@ -91,8 +91,6 @@ func setup() {
 			},
 			Started: true,
 		})
-	testingUtils.CheckFail(err, "Source SR was not able to start")
-
 	testingUtils.CheckFail(err, "Dst SR was not able to start")
 
 	client.ScrapeInterval = 2
