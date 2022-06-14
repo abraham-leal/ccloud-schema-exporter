@@ -70,8 +70,8 @@ func setup() {
 	networkName := "integration"
 
 	localZookeeperContainer, localKafkaContainer, localSchemaRegistrySrcContainer = testingUtils.GetBaseInfra(networkName)
-
-	localSchemaRegistryDstContainer, err := testcontainers.GenericContainer(ctx,
+	err := error(nil)
+	localSchemaRegistryDstContainer, err = testcontainers.GenericContainer(ctx,
 		testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
 				Image:        "confluentinc/cp-schema-registry:" + cpTestVersion,
