@@ -55,7 +55,7 @@ func GetBaseInfra(networkName string) (zooContainer testcontainers.Container, ka
 					"KAFKA_BROKER_ID":                                   "1",
 					"KAFKA_ZOOKEEPER_CONNECT":                           "zookeeper" + networkName + ":2181",
 					"KAFKA_LISTENER_SECURITY_PROTOCOL_MAP":              "PLAINTEXT:PLAINTEXT",
-					"KAFKA_ADVERTISED_LISTENERS":                        "PLAINTEXT://brokerclients:29092",
+					"KAFKA_ADVERTISED_LISTENERS":                        "PLAINTEXT://broker" + networkName + ":29092",
 					"KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR":            "1",
 					"KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS":            "0",
 					"KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR":  "1",
