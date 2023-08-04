@@ -23,7 +23,6 @@ var mockSchema = "{\"type\":\"record\",\"name\":\"value_newnew\",\"namespace\":\
 var testingSubject = "test-key"
 var newSubject = "newSubject-key"
 var SRUrl = "http://localhost:8081"
-var localZookeeperContainer testcontainers.Container
 var localKafkaContainer testcontainers.Container
 var localSchemaRegistrySrcContainer testcontainers.Container
 
@@ -50,7 +49,7 @@ func TestMainStack(t *testing.T) {
 
 func setup() {
 
-	localZookeeperContainer, localKafkaContainer, localSchemaRegistrySrcContainer = testingUtils.GetBaseInfra("clients")
+	localKafkaContainer, localSchemaRegistrySrcContainer = testingUtils.GetBaseInfra("clients")
 
 	srcSRPort, err := localSchemaRegistrySrcContainer.MappedPort(testingUtils.Ctx, "8081")
 	checkFail(err, "Not Able to get SRC SR Port")
@@ -68,8 +67,6 @@ func tearDown() {
 	checkFail(err, "Could not terminate source sr")
 	err = localKafkaContainer.Terminate(testingUtils.Ctx)
 	checkFail(err, "Could not terminate kafka")
-	err = localZookeeperContainer.Terminate(testingUtils.Ctx)
-	checkFail(err, "Could not terminate zookeeper")
 }
 
 func TIsReachable(t *testing.T) {

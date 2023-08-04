@@ -23,7 +23,7 @@ import (
 
 var testClientSrc *client.SchemaRegistryClient
 var testClientDst *client.SchemaRegistryClient
-var cpTestVersion = "7.1.1"
+var cpTestVersion = "7.4.1"
 var testingSubjectValue = "someSubject-value"
 var testingSubjectKey = "someSubject-key"
 var softDeleteLogMessage = "Testing soft delete sync"
@@ -47,7 +47,6 @@ var schemaReferencerSchemaLoad = "{\"type\": \"record\",\"namespace\": \"com.myc
 var schemaToReference = "{\"type\":\"record\",\"name\":\"reference\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"},{\"name\":\"someField2\",\"type\":\"int\"}]}"
 var schemaToReferenceFinal = "{\"type\":\"record\",\"name\":\"referenceWithDepth\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"}]}"
 var schemaReferencing = "{\"type\":\"record\",\"name\":\"sampleRecordreferencing\",\"namespace\":\"com.mycorp.somethinghere\",\"fields\":[{\"name\":\"reference\",\"type\":\"com.reference.reference\"}]}"
-var localZookeeperContainer testcontainers.Container
 var localKafkaContainer testcontainers.Container
 var localSchemaRegistrySrcContainer testcontainers.Container
 var localSchemaRegistryDstContainer testcontainers.Container
@@ -69,7 +68,7 @@ func TestMain(m *testing.M) {
 func setup() {
 	networkName := "integration"
 
-	localZookeeperContainer, localKafkaContainer, localSchemaRegistrySrcContainer = testingUtils.GetBaseInfra(networkName)
+	localKafkaContainer, localSchemaRegistrySrcContainer = testingUtils.GetBaseInfra(networkName)
 	err := error(nil)
 	localSchemaRegistryDstContainer, err = testcontainers.GenericContainer(ctx,
 		testcontainers.GenericContainerRequest{
@@ -113,8 +112,6 @@ func tearDown() {
 	testingUtils.CheckFail(err, "Could not terminate destination sr")
 	err = localKafkaContainer.Terminate(ctx)
 	testingUtils.CheckFail(err, "Could not terminate kafka")
-	err = localZookeeperContainer.Terminate(ctx)
-	testingUtils.CheckFail(err, "Could not terminate zookeeper")
 }
 
 func TestSchemaLoad(t *testing.T) {

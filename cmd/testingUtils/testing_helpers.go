@@ -7,10 +7,10 @@ import (
 	"log"
 )
 
-var cpTestVersion = "7.1.1"
+var cpTestVersion = "7.4.1"
 var Ctx = context.Background()
 
-func GetBaseInfra(networkName string) (zooContainer testcontainers.Container, kafkaContainer testcontainers.Container, schemaRegistryContainer testcontainers.Container) {
+func GetBaseInfra(networkName string) (kafkaContainer testcontainers.Container, schemaRegistryContainer testcontainers.Container) {
 	var network = testcontainers.NetworkRequest{
 		Name:   networkName,
 		Driver: "bridge",
@@ -27,35 +27,23 @@ func GetBaseInfra(networkName string) (zooContainer testcontainers.Container, ka
 		}
 	}
 
-	zooContainer, err = testcontainers.GenericContainer(Ctx,
-		testcontainers.GenericContainerRequest{
-			ContainerRequest: testcontainers.ContainerRequest{
-				Image:        "confluentinc/cp-zookeeper:" + cpTestVersion,
-				ExposedPorts: []string{"2181/tcp"},
-				WaitingFor:   wait.ForListeningPort("2181/tcp"),
-				Name:         "zookeeper" + networkName,
-				Env: map[string]string{
-					"ZOOKEEPER_CLIENT_PORT": "2181",
-					"ZOOKEEPER_TICK_TIME":   "2000",
-				},
-				Networks: []string{networkName},
-			},
-			Started: true,
-		})
-	CheckFail(err, "Zookeeper was not able to start")
-
 	kafkaContainer, err = testcontainers.GenericContainer(Ctx,
 		testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
-				Image:        "confluentinc/cp-server:" + cpTestVersion,
-				ExposedPorts: []string{"29092/tcp"},
+				Image:        "confluentinc/confluent-local:" + cpTestVersion,
+				ExposedPorts: []string{"29092/tcp", "29093/tcp", "9092/tcp"},
 				WaitingFor:   wait.ForListeningPort("29092/tcp"),
 				Name:         "broker" + networkName,
 				Env: map[string]string{
-					"KAFKA_BROKER_ID":                                   "1",
-					"KAFKA_ZOOKEEPER_CONNECT":                           "zookeeper" + networkName + ":2181",
-					"KAFKA_LISTENER_SECURITY_PROTOCOL_MAP":              "PLAINTEXT:PLAINTEXT",
-					"KAFKA_ADVERTISED_LISTENERS":                        "PLAINTEXT://broker" + networkName + ":29092",
+					"CLUSTER_ID":                                        "E__VgOY5Tna5qbyDTtFbTg",
+					"KAFKA_PROCESS_ROLES":                               "broker,controller",
+					"KAFKA_NODE_ID":                                     "1",
+					"KAFKA_CONTROLLER_QUORUM_VOTERS":                    "1@broker" + networkName + ":29093",
+					"KAFKA_CONTROLLER_LISTENER_NAMES":                   "CONTROLLER",
+					"KAFKA_LISTENER_SECURITY_PROTOCOL_MAP":              "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT",
+					"KAFKA_LISTENERS":                                   "PLAINTEXT://broker" + networkName + ":29092,CONTROLLER://broker" + networkName + ":29093,PLAINTEXT_HOST://0.0.0.0:9092",
+					"KAFKA_ADVERTISED_LISTENERS":                        "PLAINTEXT://broker" + networkName + ":29092, PLAINTEXT_HOST://localhost:9092",
+					"KAFKA_INTER_BROKER_LISTENER_NAME":                  "PLAINTEXT",
 					"KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR":            "1",
 					"KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS":            "0",
 					"KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR":  "1",
@@ -90,7 +78,7 @@ func GetBaseInfra(networkName string) (zooContainer testcontainers.Container, ka
 		})
 	CheckFail(err, "Source SR was not able to start")
 
-	return zooContainer, kafkaContainer, schemaRegistryContainer
+	return kafkaContainer, schemaRegistryContainer
 }
 
 // Simple check function that will fail all if there is an error present and allows a custom message to be printed
