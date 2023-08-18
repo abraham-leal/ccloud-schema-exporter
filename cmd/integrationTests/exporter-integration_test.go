@@ -23,7 +23,7 @@ import (
 
 var testClientSrc *client.SchemaRegistryClient
 var testClientDst *client.SchemaRegistryClient
-var cpTestVersion = "7.4.1"
+var cpTestVersion = "7.1.1"
 var testingSubjectValue = "someSubject-value"
 var testingSubjectKey = "someSubject-key"
 var softDeleteLogMessage = "Testing soft delete sync"
