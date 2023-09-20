@@ -2,6 +2,7 @@ package testingUtils
 
 import (
 	"context"
+	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"log"
@@ -59,18 +60,13 @@ func GetBaseInfra(networkName string) (kafkaContainer testcontainers.Container, 
 		})
 	CheckFail(err, "Kafka was not able to start")
 
-	var i int
 	schemaRegistryContainer, err = testcontainers.GenericContainer(Ctx,
 		testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
 				Image:        "confluentinc/cp-schema-registry:" + cpTestVersion,
 				ExposedPorts: []string{"8081/tcp"},
-				WaitingFor: wait.ForHTTP("/").
-					WithPort("8081/tcp").
-					WithStartupTimeout(time.Second * 30).
-					WithMethod(http.MethodGet).
-					WithStatusCodeMatcher(func(status int) bool { i++; return i > 1 && status == 200 }),
-				Name: "schema-registry-src-" + networkName,
+				WaitingFor:   GetSRWaitStrategy("8081"),
+				Name:         "schema-registry-src-" + networkName,
 				Env: map[string]string{
 					"SCHEMA_REGISTRY_HOST_NAME":                           "schema-registry-src",
 					"SCHEMA_REGISTRY_SCHEMA_REGISTRY_GROUP_ID":            "schema-src",
@@ -86,6 +82,16 @@ func GetBaseInfra(networkName string) (kafkaContainer testcontainers.Container, 
 	CheckFail(err, "Source SR was not able to start")
 
 	return kafkaContainer, schemaRegistryContainer
+}
+
+// Pass in: Port to wait for 200 return
+func GetSRWaitStrategy(port string) wait.Strategy {
+	var i int
+	return wait.ForHTTP("/").
+		WithPort(nat.Port(port + "/tcp")).
+		WithStartupTimeout(time.Second * 30).
+		WithMethod(http.MethodGet).
+		WithStatusCodeMatcher(func(status int) bool { i++; return i > 1 && status == 200 })
 }
 
 // Simple check function that will fail all if there is an error present and allows a custom message to be printed
