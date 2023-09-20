@@ -1,16 +1,15 @@
 language: go
 
 go:
-  - 1.17.x
-  - 1.18.x
+  - 1.19.x
+  - 1.20.x
 
 services:
   - docker
 
 script:
-  - docker pull confluentinc/cp-zookeeper:7.1.1
-  - docker pull confluentinc/cp-server:7.1.1
-  - docker pull confluentinc/cp-schema-registry:7.1.1
+  - docker pull confluentinc/confluent-local:7.4.1
+  - docker pull confluentinc/cp-schema-registry:7.4.1
   - go build cmd/ccloud-schema-exporter/ccloud-schema-exporter.go
   - cd cmd/integrationTests
   - go test

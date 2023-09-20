@@ -11,7 +11,6 @@ import (
 	testingUtils "github.com/abraham-leal/ccloud-schema-exporter/cmd/testingUtils"
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
 	"io/ioutil"
 	"log"
 	"os"
@@ -23,7 +22,7 @@ import (
 
 var testClientSrc *client.SchemaRegistryClient
 var testClientDst *client.SchemaRegistryClient
-var cpTestVersion = "7.1.1"
+var cpTestVersion = "7.4.1"
 var testingSubjectValue = "someSubject-value"
 var testingSubjectKey = "someSubject-key"
 var softDeleteLogMessage = "Testing soft delete sync"
@@ -47,7 +46,6 @@ var schemaReferencerSchemaLoad = "{\"type\": \"record\",\"namespace\": \"com.myc
 var schemaToReference = "{\"type\":\"record\",\"name\":\"reference\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"},{\"name\":\"someField2\",\"type\":\"int\"}]}"
 var schemaToReferenceFinal = "{\"type\":\"record\",\"name\":\"referenceWithDepth\",\"namespace\":\"com.reference\",\"fields\":[{\"name\":\"someField\",\"type\":\"string\"}]}"
 var schemaReferencing = "{\"type\":\"record\",\"name\":\"sampleRecordreferencing\",\"namespace\":\"com.mycorp.somethinghere\",\"fields\":[{\"name\":\"reference\",\"type\":\"com.reference.reference\"}]}"
-var localZookeeperContainer testcontainers.Container
 var localKafkaContainer testcontainers.Container
 var localSchemaRegistrySrcContainer testcontainers.Container
 var localSchemaRegistryDstContainer testcontainers.Container
@@ -69,14 +67,14 @@ func TestMain(m *testing.M) {
 func setup() {
 	networkName := "integration"
 
-	localZookeeperContainer, localKafkaContainer, localSchemaRegistrySrcContainer = testingUtils.GetBaseInfra(networkName)
+	localKafkaContainer, localSchemaRegistrySrcContainer = testingUtils.GetBaseInfra(networkName)
 	err := error(nil)
 	localSchemaRegistryDstContainer, err = testcontainers.GenericContainer(ctx,
 		testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
 				Image:        "confluentinc/cp-schema-registry:" + cpTestVersion,
 				ExposedPorts: []string{"8082/tcp"},
-				WaitingFor:   wait.ForListeningPort("8082/tcp"),
+				WaitingFor:   testingUtils.GetSRWaitStrategy("8082"),
 				Name:         "schema-registry-dst-" + networkName,
 				Env: map[string]string{
 					"SCHEMA_REGISTRY_HOST_NAME":                           "schema-registry-dst",
@@ -113,8 +111,6 @@ func tearDown() {
 	testingUtils.CheckFail(err, "Could not terminate destination sr")
 	err = localKafkaContainer.Terminate(ctx)
 	testingUtils.CheckFail(err, "Could not terminate kafka")
-	err = localZookeeperContainer.Terminate(ctx)
-	testingUtils.CheckFail(err, "Could not terminate zookeeper")
 }
 
 func TestSchemaLoad(t *testing.T) {

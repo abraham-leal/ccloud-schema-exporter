@@ -1,4 +1,4 @@
-FROM golang:1.15.8 as builder
+FROM golang:1.20.5 AS builder
 COPY . /app
 WORKDIR /app
 RUN CGO_ENABLED=0 GOOS=linux go build ./cmd/ccloud-schema-exporter/ccloud-schema-exporter.go
