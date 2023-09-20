@@ -14,6 +14,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -70,13 +71,18 @@ func setup() {
 
 	localKafkaContainer, localSchemaRegistrySrcContainer = testingUtils.GetBaseInfra(networkName)
 	err := error(nil)
+	var i int
 	localSchemaRegistryDstContainer, err = testcontainers.GenericContainer(ctx,
 		testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
 				Image:        "confluentinc/cp-schema-registry:" + cpTestVersion,
 				ExposedPorts: []string{"8082/tcp"},
-				WaitingFor:   wait.ForListeningPort("8082/tcp"),
-				Name:         "schema-registry-dst-" + networkName,
+				WaitingFor: wait.ForHTTP("/").
+					WithPort("8082/tcp").
+					WithStartupTimeout(time.Second * 30).
+					WithMethod(http.MethodGet).
+					WithStatusCodeMatcher(func(status int) bool { i++; return i > 1 && status == 200 }),
+				Name: "schema-registry-dst-" + networkName,
 				Env: map[string]string{
 					"SCHEMA_REGISTRY_HOST_NAME":                           "schema-registry-dst",
 					"SCHEMA_REGISTRY_SCHEMA_REGISTRY_GROUP_ID":            "schema-dst",

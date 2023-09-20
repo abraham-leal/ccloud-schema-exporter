@@ -5,6 +5,8 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"log"
+	"net/http"
+	"time"
 )
 
 var cpTestVersion = "7.4.1"
@@ -57,13 +59,18 @@ func GetBaseInfra(networkName string) (kafkaContainer testcontainers.Container, 
 		})
 	CheckFail(err, "Kafka was not able to start")
 
+	var i int
 	schemaRegistryContainer, err = testcontainers.GenericContainer(Ctx,
 		testcontainers.GenericContainerRequest{
 			ContainerRequest: testcontainers.ContainerRequest{
 				Image:        "confluentinc/cp-schema-registry:" + cpTestVersion,
 				ExposedPorts: []string{"8081/tcp"},
-				WaitingFor:   wait.ForListeningPort("8081/tcp"),
-				Name:         "schema-registry-src-" + networkName,
+				WaitingFor: wait.ForHTTP("/").
+					WithPort("8081/tcp").
+					WithStartupTimeout(time.Second * 30).
+					WithMethod(http.MethodGet).
+					WithStatusCodeMatcher(func(status int) bool { i++; return i > 1 && status == 200 }),
+				Name: "schema-registry-src-" + networkName,
 				Env: map[string]string{
 					"SCHEMA_REGISTRY_HOST_NAME":                           "schema-registry-src",
 					"SCHEMA_REGISTRY_SCHEMA_REGISTRY_GROUP_ID":            "schema-src",
