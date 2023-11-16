@@ -417,13 +417,13 @@ func (ap *ApicurioSource) GetSourceState() (map[string][]int64, error) {
 
 			if metaResponseContainer.Stype == "AVRO" || metaResponseContainer.Stype == "JSON" ||
 				metaResponseContainer.Stype == "PROTOBUF" {
-				artifactVersions, haveSeenBefore := sourceState[artifactID]
+				artifactVersions, haveSeenBefore := sourceState[metaResponseContainer.Id]
 				if !haveSeenBefore {
-					sourceState[metaResponseContainer.Name] = []int64{metaResponseContainer.Version}
-					ap.referenceName[metaResponseContainer.Name] = artifactID
+					sourceState[metaResponseContainer.Id] = []int64{metaResponseContainer.Version}
+					ap.referenceName[metaResponseContainer.Id] = artifactID
 				} else {
 					artifactVersions := append(artifactVersions, metaResponseContainer.Version)
-					sourceState[metaResponseContainer.Name] = artifactVersions
+					sourceState[metaResponseContainer.Id] = artifactVersions
 					log.Println(sourceState)
 				}
 			}
