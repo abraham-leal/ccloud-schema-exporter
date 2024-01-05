@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
 	"reflect"
 	"strconv"
@@ -65,15 +66,15 @@ func RunCustomSourceSync(dstClient *SchemaRegistryClient, customSrc CustomSource
 func customSrcSync(diff map[string][]int64, dstClient *SchemaRegistryClient, customSrc CustomSource) {
 	if len(diff) != 0 {
 		log.Println("Custom Source has values that Schema Registry does not, syncing...")
-		for sbj, versions := range diff {
+		for subject, versions := range diff {
 			for _, v := range versions {
-				id, stype, schema, references, err := customSrc.GetSchema(sbj, v)
+				id, stype, schema, references, err := customSrc.GetSchema(subject, v)
 				if err != nil {
 					log.Println("Could not retrieve schema from custom source")
 				}
-				if checkSubjectIsAllowed(sbj) {
+				if checkSubjectIsAllowed(subject) {
 					thisSchemaRecord := SchemaRecord{
-						Subject:    sbj,
+						Subject:    subject,
 						Schema:     schema,
 						SType:      stype,
 						Version:    v,
@@ -82,7 +83,7 @@ func customSrcSync(diff map[string][]int64, dstClient *SchemaRegistryClient, cus
 					}
 					// Assure References are registered first
 					RegisterReferencesWithCustomSource(thisSchemaRecord, customSrc, dstClient)
-					log.Println("Registering new schema: " + sbj +
+					log.Println("Registering new schema: " + subject +
 						" with version: " + strconv.FormatInt(v, 10) +
 						" and ID: " + strconv.FormatInt(id, 10) +
 						" and Type: " + stype)
@@ -128,7 +129,7 @@ func RunCustomSourceBatch(dstClient *SchemaRegistryClient, customSrc CustomSourc
 	checkDontFail(err)
 
 	log.Println("Registering all schemas from custom source")
-	for sbj, srcVersions := range srcSubjects {
+	for subject, srcVersions := range srcSubjects {
 		if CancelRun == true {
 			err := customSrc.TearDown()
 			if err != nil {
@@ -138,13 +139,13 @@ func RunCustomSourceBatch(dstClient *SchemaRegistryClient, customSrc CustomSourc
 			return
 		}
 		for _, v := range srcVersions {
-			id, stype, schema, references, err := customSrc.GetSchema(sbj, v)
+			id, stype, schema, references, err := customSrc.GetSchema(subject, v)
 			if err != nil {
 				log.Println("Could not retrieve schema from custom source")
 			} else {
-				if checkSubjectIsAllowed(sbj) {
+				if checkSubjectIsAllowed(subject) {
 					thisSchemaRecord := SchemaRecord{
-						Subject:    sbj,
+						Subject:    subject,
 						Schema:     schema,
 						SType:      stype,
 						Version:    v,
@@ -154,7 +155,7 @@ func RunCustomSourceBatch(dstClient *SchemaRegistryClient, customSrc CustomSourc
 					// Assure references are registered first
 					RegisterReferencesWithCustomSource(thisSchemaRecord, customSrc, dstClient)
 					log.Printf("Registering schema: %s with version: %d and ID: %d and Type: %s",
-						sbj, v, id, stype)
+						subject, v, id, stype)
 					dstClient.RegisterSchemaBySubjectAndIDAndVersion(thisSchemaRecord.Schema,
 						thisSchemaRecord.Subject, thisSchemaRecord.Id, thisSchemaRecord.Version,
 						thisSchemaRecord.SType, thisSchemaRecord.References)
@@ -222,15 +223,13 @@ func NewApicurioSource() ApicurioSource {
 		}
 		log.Printf("Starting Apicurio Source with endpoint: %s", apicurioOptionsMap["apicurioUrl"])
 		return ApicurioSource{
-			Options:       apicurioOptionsMap,
-			apiCurioUrl:   apicurioOptionsMap["apicurioUrl"],
-			referenceName: map[string]string{},
+			Options:     apicurioOptionsMap,
+			apiCurioUrl: apicurioOptionsMap["apicurioUrl"],
 		}
 	}
 	return ApicurioSource{
-		Options:       apicurioOptionsMap,
-		apiCurioUrl:   "http://localhost:8081/api",
-		referenceName: map[string]string{},
+		Options:     apicurioOptionsMap,
+		apiCurioUrl: "http://localhost:8081",
 	}
 }
 
@@ -304,15 +303,20 @@ type SchemaApicurioMeta struct {
 }
 
 type ApicurioSource struct {
-	Options       map[string]string
-	apiCurioUrl   string
-	referenceName map[string]string
+	Options                              map[string]string
+	apiCurioUrl                          string
+	apiCurioCoreRegistryAPIv1            string
+	apiCurioCoreRegistryAPIv2            string
+	apiCurioConfluentSchemaRegistryAPIv6 string
 }
 
 func (ap *ApicurioSource) SetUp() error {
 	url, exists := ap.Options["apicurioUrl"]
-	if exists && ap.apiCurioUrl != "http://localhost:8081/api" {
-		ap.apiCurioUrl = url + "/api"
+	if exists && ap.apiCurioUrl != "http://localhost:8081" {
+		ap.apiCurioUrl = url
+		ap.apiCurioCoreRegistryAPIv1 = url + "/apis/registry/v1"
+		ap.apiCurioCoreRegistryAPIv2 = url + "/apis/registry/v2"
+		ap.apiCurioConfluentSchemaRegistryAPIv6 = url + "/apis/ccompat/v6"
 		delete(ap.Options, "apicurioUrl")
 	} else {
 		log.Println("Options not provided, using local apicurio connection at: http://localhost:8081")
@@ -321,54 +325,35 @@ func (ap *ApicurioSource) SetUp() error {
 }
 
 func (ap *ApicurioSource) GetSchema(subject string, version int64) (id int64, stype string, schema string, references []SchemaReference, err error) {
-	artifactID, isThere := ap.referenceName[subject]
-	if !isThere {
-		log.Println("State snapshot does not match new requests. Allow a new run for a better sync.")
-	}
-	getSchemaEndpoint := fmt.Sprintf("%s/artifacts/%s/versions/%v", ap.apiCurioUrl, artifactID, version)
-	log.Println(getSchemaEndpoint)
-	metaEndpoint := getSchemaEndpoint + "/meta"
-	metaReq := GetNewRequest("GET", metaEndpoint, "x", "x", ap.Options, nil)
+	log.Printf("Getting schema for subject: %s and version: %d", subject, version)
+	getSchemaEndpoint := fmt.Sprintf("%s/subjects/%s/versions/%d", ap.apiCurioConfluentSchemaRegistryAPIv6, url.QueryEscape(subject), version)
 	schemaReq := GetNewRequest("GET", getSchemaEndpoint, "x", "x", ap.Options, nil)
 
-	metaResponse, err := httpClient.Do(metaReq)
-	checkDontFail(err)
-	if metaResponse.StatusCode != 200 {
-		log.Println("Could not fetch schema metadata")
-	}
-	metaResponseContainer := SchemaApicurioMeta{}
-
-	metaBody, err := ioutil.ReadAll(metaResponse.Body)
-	checkDontFail(err)
-	metaResponse.Body.Close()
-
-	err = json.Unmarshal(metaBody, &metaResponseContainer)
-	checkDontFail(err)
-
 	schemaResponse, err := httpClient.Do(schemaReq)
-	checkDontFail(err)
 	if schemaResponse.StatusCode != 200 {
 		log.Println("Could not fetch schema")
 	}
 
-	schemaBody, err := ioutil.ReadAll(schemaResponse.Body)
+	schemaRefsBody, err := ioutil.ReadAll(schemaResponse.Body)
 	checkDontFail(err)
 	schemaResponse.Body.Close()
 
-	return metaResponseContainer.GlobalId, metaResponseContainer.Stype, string(schemaBody), nil, nil
+	schemaRefsContainer := SchemaToRegister{}
+	err = json.Unmarshal(schemaRefsBody, &schemaRefsContainer)
+
+	return schemaRefsContainer.Id, schemaRefsContainer.SType, schemaRefsContainer.Schema, schemaRefsContainer.References, nil
 }
 
 func (ap *ApicurioSource) GetSourceState() (map[string][]int64, error) {
-	ap.referenceName = make(map[string]string)
-
 	// Get All Artifacts
-	listArtifactsEndpoint := fmt.Sprintf("%s/artifacts", ap.apiCurioUrl)
+	listArtifactsEndpoint := fmt.Sprintf("%s/artifacts", ap.apiCurioCoreRegistryAPIv1)
 	listReq := GetNewRequest("GET", listArtifactsEndpoint, "x", "x", ap.Options, nil)
 	listResponse, err := httpClient.Do(listReq)
 	checkDontFail(err)
 	if listResponse.StatusCode != 200 {
 		log.Println("Could not fetch artifact metadata for state assessment")
 	}
+
 	listResponseContainer := []string{}
 	listBody, err := ioutil.ReadAll(listResponse.Body)
 	checkDontFail(err)
@@ -417,14 +402,12 @@ func (ap *ApicurioSource) GetSourceState() (map[string][]int64, error) {
 
 			if metaResponseContainer.Stype == "AVRO" || metaResponseContainer.Stype == "JSON" ||
 				metaResponseContainer.Stype == "PROTOBUF" {
-				artifactVersions, haveSeenBefore := sourceState[artifactID]
+				artifactVersions, haveSeenBefore := sourceState[metaResponseContainer.Id]
 				if !haveSeenBefore {
-					sourceState[metaResponseContainer.Name] = []int64{metaResponseContainer.Version}
-					ap.referenceName[metaResponseContainer.Name] = artifactID
+					sourceState[metaResponseContainer.Id] = []int64{metaResponseContainer.Version}
 				} else {
 					artifactVersions := append(artifactVersions, metaResponseContainer.Version)
-					sourceState[metaResponseContainer.Name] = artifactVersions
-					log.Println(sourceState)
+					sourceState[metaResponseContainer.Id] = artifactVersions
 				}
 			}
 		}
