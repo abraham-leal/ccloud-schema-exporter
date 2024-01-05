@@ -105,6 +105,9 @@ func parseFileName(filepath string) (int64, int64, string, string) {
 	if strings.LastIndex(filepath, "/") != -1 {
 		startFileName = strings.LastIndex(filepath, "/") + 1
 	}
+	if strings.LastIndex(filepath, "\\") != -1 {
+		startFileName = strings.LastIndex(filepath, "\\") + 1
+	}
 	schemaFileName := filepath[startFileName:]
 	schemaType := schemaFileName[strings.LastIndex(schemaFileName, "-")+1:]
 	schemaFileNameNoType := schemaFileName[:strings.LastIndex(schemaFileName, "-")]
